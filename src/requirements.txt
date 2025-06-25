@@ -1,0 +1,5 @@
+aiohttp==3.11.18
+jsonpickle==4.0.5
+pandas==2.3.0
+Requests==2.32.4
+signalrcore==0.9.5

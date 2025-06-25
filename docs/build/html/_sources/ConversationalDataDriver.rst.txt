@@ -1,0 +1,9 @@
+ConversationalData
+==================
+
+.. autoclass:: inmydata.ConversationalData.ConversationalDataDriver
+   :members:
+   :undoc-members:
+   :show-inheritance:
+   :no-index:
+   :special-members: __init__

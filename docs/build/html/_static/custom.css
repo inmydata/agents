@@ -1,0 +1,13 @@
+
+a {
+    color: #dd3333 !important;
+}
+
+a:visited {
+    color: #dd3333 !important;
+}
+
+.sig:not(.sig-inline) {
+    background-color: #eeeeee;
+}
+
