@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "inmydata"
-version = "0.0.12"
+version = "0.0.13"
 authors = [
   { name = "inmydata", email = "info@inmydata.com" },
 ]
@@ -31,4 +31,6 @@ Homepage = "https://inmydata.ai"
 Documentation = "https://developer.inmydata.com"
 Reference = "https://docs.inmydata.ai/agents/"
 Issues = "https://support.inmydata.com"
+Source = "https://github.com/inmydata/agents"
+Examples = "https://github.com/inmydata/agent-examples"
 
