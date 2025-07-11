@@ -23,6 +23,7 @@ To install::
    AITypeEnum
    Answer
    CalendarAssistant
+   ChartType
    ConditionOperator
    ConversationalDataDriver
    FinancialPeriodDetails

@@ -168,7 +168,9 @@ class StructuredDataDriver:
     Attributes:
         tenant (str): The tenant identifier for the inmydata platform.
         server (str): The server address for the inmydata platform, default is "inmydata.com".
-        logging_level (int): The logging level for the logger, default is logging.INFO.
+        user (Optional[str]): The user for whom the driver is initialized, if None, no user is set. Useful to identify the user when generating a chart (see https://developer.inmydata.com/a/solutions/articles/36000577995?portalId=36000061664).
+        session_id (Optional[str]): The session ID for the driver, if None, no session ID is set. Useful to identify the session when generating a chart (see https://developer.inmydata.com/a/solutions/articles/36000577995?portalId=36000061664).
+        logging_level (Optional[int]): The logging level for the logger, default is logging.INFO.
         log_file (Optional[str]): The file to log messages to, if None, logs will be printed to the console.
     """
     class _AIDataAPIRequest:
@@ -193,7 +195,7 @@ class StructuredDataDriver:
           return json.dumps(self, default=lambda o: o.__dict__, sort_keys=True, indent=4)
         
     class _AIChartAPIRequest:
-        def __init__(self,Subject,RowFields,ColumnsFields,MetricFields,Filters,ChartType,User,Caption):      
+        def __init__(self,Subject,RowFields,ColumnsFields,MetricFields,Filters,ChartType,Caption,User,SessionID):      
           self.Subject = Subject
           self.RowFields = RowFields
           self.ColumnFields = ColumnsFields
@@ -202,6 +204,7 @@ class StructuredDataDriver:
           self.ChartType = ChartType
           self.User = User
           self.Caption = Caption
+          self.SessionID = SessionID
         def to_dict(self):
             return {
                 "Subject": self.Subject,
@@ -211,7 +214,8 @@ class StructuredDataDriver:
                 "Filters": [f.to_dict() for f in self.Filters], 
                 "ChartType": self.ChartType.name.lower(),  
                 "User": self.User,
-                "Caption": self.Caption
+                "Caption": self.Caption,
+                "SessionID": self.SessionID
             }
         
     class _AIChartAPIResponse:
@@ -220,21 +224,27 @@ class StructuredDataDriver:
         def toJSON(self):
           return json.dumps(self, default=lambda o: o.__dict__, sort_keys=True, indent=4)
 
-    def __init__(self, tenant: str, server:str ="inmydata.com", logging_level=logging.INFO, log_file: Optional[str] = None ):
+    def __init__(self, tenant: str, server:str ="inmydata.com", user: Optional[str] = None, session_id: Optional[str] = None,  logging_level: Optional[int] = logging.INFO, log_file: Optional[str] = None ):
         """
         Initializes the StructuredDataDriver with the specified tenant, server, logging level, and log file.
         
         Args:
             tenant (str): The tenant identifier for the inmydata platform.      
             server (str): The server address for the inmydata platform, default is "inmydata.com".  
+            user (Optional[str]): The user for whom the driver is initialized, if None, no user is set. Useful to identify the user when generating a chart.
+            session_id (Optional[str]): The session ID for the driver, if None, no session ID is set. Useful to identify the session when generating a chart.
             logging_level (int): The logging level for the logger, default is logging.INFO.
             log_file (Optional[str]): The file to log messages to, if None, logs will be printed to the console.
         """
         self.server = server
         self.tenant = tenant
+        self.user = user
+        self.session_id = session_id
 
         # Create a logger specific to this class/instance
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}.{tenant}")
+        if logging_level is None:
+            logging_level = logging.INFO
         self.logger.setLevel(logging_level)
         
         # Avoid adding multiple handlers if this gets called multiple times
@@ -324,10 +334,10 @@ class StructuredDataDriver:
               filters.append(filter)
             return self.get_data(subject,fields,filters)
     
-    def get_chart(self,subject:str,rowfields:list[str],columnfields:list[str],metricfields:list[str],filters:list[AIDataFilter],charttype:ChartType,user:str,caption:str):
+    def get_chart(self,subject:str,rowfields:list[str],columnfields:list[str],metricfields:list[str],filters:list[AIDataFilter],charttype:ChartType,caption:str):
         """
         Generates a chart based on the specified subject, row fields, column fields, metric fields, 
-        filters, chart type, user, and caption. 
+        filters, chart type, user, and caption. For details on showing charts in your app, see https://developer.inmydata.com/a/solutions/articles/36000577995?portalId=36000061664
 
         Args:
             subject (str): The subject to query data from.
@@ -336,14 +346,13 @@ class StructuredDataDriver:
             metricfields (list[str]): The list of fields to use as metrics in the chart.
             filters (list[AIDataFilter]): The list of filters to apply to the query.
             charttype (ChartType): The type of chart to generate.
-            user (str): The user for whom the chart is generated.
             caption (str): The caption for the chart.
 
         Returns:
             str: The ID of the generated visualisation.
         """
         result = None
-        aichartreq = self._AIChartAPIRequest(subject,rowfields,columnfields,metricfields,filters,charttype,user,caption)
+        aichartreq = self._AIChartAPIRequest(subject,rowfields,columnfields,metricfields,filters,charttype,self.user,caption,self.session_id)
         input_json_string  = jsonpickle.encode(aichartreq.to_dict(), unpicklable=False)
         if input_json_string is None:
             raise ValueError("input_json_string is None and cannot be loaded as JSON")

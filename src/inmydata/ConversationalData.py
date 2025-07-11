@@ -101,14 +101,18 @@ class ConversationalDataDriver:
         The tenant identifier for the inmydata platform.
     server : str
         The server address for the inmydata platform, default is "inmydata.com".
-    logging_level : int
+    user : Optional[str]
+        The user for whom the driver is initialized, if None, no user is set. Useful to identify the user when generating a chart (see https://developer.inmydata.com/a/solutions/articles/36000577995?portalId=36000061664).
+    session_id : Optional[str]      
+        The session ID for the driver, if None, no session ID is set. Useful to identify the session when generating a chart (see https://developer.inmydata.com/a/solutions/articles/36000577995?portalId=36000061664).
+    logging_level : Optional[int]
         The logging level for the logger, default is logging.INFO.
     log_file : Optional[str]
         The file to log messages to, if None, logs to console.
     """
 
     class _AIQuestionAPIRequest:
-        def __init__(self, Subject,Question,Date,Model,OutputType,AIType,SkipZeroQuestion,SkipGeneralQuestion,SummariseComments):
+        def __init__(self, Subject,Question,Date,Model,OutputType,AIType,SkipZeroQuestion,SkipGeneralQuestion,SummariseComments,ShowinChartComponent,User,SessionID):
           self.Subject = Subject
           self.Question = Question
           self.Date = Date
@@ -118,6 +122,9 @@ class ConversationalDataDriver:
           self.SkipZeroQuestion = SkipZeroQuestion
           self.SkipGeneralQuestion = SkipGeneralQuestion
           self.SummariseComments = SummariseComments
+          self.ShowinChartComponent = ShowinChartComponent
+          self.User = User
+          self.SessionID = SessionID
         def toJSON(self):
           return json.dumps(self, default=lambda o: o.__dict__, sort_keys=True, indent=4)
 
@@ -139,22 +146,28 @@ class ConversationalDataDriver:
         def toJSON(self):
           return json.dumps(self, default=lambda o: o.__dict__, sort_keys=True, indent=4)
 
-    def __init__(self, tenant: str, server:str ="inmydata.com", logging_level=logging.INFO, log_file: Optional[str] = None):
+    def __init__(self, tenant: str, server:str ="inmydata.com", user: Optional[str] = None, session_id: Optional[str] = None,  logging_level: Optional[int] = logging.INFO, log_file: Optional[str] = None):
         """
         Initializes the ConversationalDataDriver with the specified tenant, server, logging level, and optional log file.
         
         Args:
             tenant (str): The tenant identifier for the inmydata platform.
-            server (str): The server address for the inmydata platform, default is "inmydata.com".
+            server (str): The server address for the inmydata platform, default is "inmydata.com".  
+            user (Optional[str]): The user for whom the driver is initialized, if None, no user is set. Useful to identify the user when generating a chart.
+            session_id (Optional[str]): The session ID for the driver, if None, no session ID is set. Useful to identify the session when generating a chart.
             logging_level (int): The logging level for the logger, default is logging.INFO.
             log_file (Optional[str]): The file to log messages to, if None, logs to console.
         """
         self._callbacks = {} 
         self.server = server
         self.tenant = tenant
+        self.user = user
+        self.session_id = session_id
         
         # Create a logger specific to this class/instance
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}.{tenant}")
+        if logging_level is None:
+            logging_level = logging.INFO
         self.logger.setLevel(logging_level)
 
         # Avoid adding multiple handlers if this gets called multiple times
@@ -194,13 +207,14 @@ class ConversationalDataDriver:
         self.logger.info("ConversationalDataDriver initialized.")
         pass
 
-    async def get_answer(self, question: str, subject: Optional[str] = None) -> Answer:
+    async def get_answer(self, question: str, subject: Optional[str] = None, generate_chart: Optional[bool] = False) -> Answer:
         """
         Returns a text response for a given question.
 
         Args:
             question (str): The question you want to ask.
             subject (str, optional): The subject you want to ask the question about. If None provided, copilot with choose the subject.
+            generate_chart (bool, optional): If True, the response will generate a chart. Default is False. (see https://developer.inmydata.com/a/solutions/articles/36000577995?portalId=36000061664)
 
         Raises:
             ai_question_update: This event is triggered when the AI question status is updated. The callback function will receive the instance of this class and a string containing the status message as parameters.
@@ -209,17 +223,18 @@ class ConversationalDataDriver:
             Answer: A string response to the question.
         """
         self.logger.info("query_for_answer question: " + question)        
-        answer = await self.__get_answer(subject, question)
+        answer = await self.__get_answer(subject, question,generate_chart)
         self.logger.info("query_for_answer answer: " + str(answer))    
         return answer is not None and answer or Answer("No answer available.","No subject provided.")
 
-    async def get_data_frame(self, question: str, subject: Optional[str] = None) -> Optional[pd.DataFrame]:
+    async def get_data_frame(self, question: str, subject: Optional[str] = None, generate_chart: Optional[bool] = False) -> Optional[pd.DataFrame]:
         """
         Returns a pandas DataFrame response for a given question.
 
         Args:
             question (str): The question you want to ask.
             subject (str, optional): The subject you want to ask the question about. If None provided, copilot with choose the subject.
+            generate_chart (bool, optional): If True, the response will generate a chart. Default is False. (see https://developer.inmydata.com/a/solutions/articles/36000577995?portalId=36000061664)
 
         Raises:
             ai_question_update: This event is triggered when the AI question status is updated. The callback function will receive the instance of this class and a string containing the status message as parameters.
@@ -227,20 +242,21 @@ class ConversationalDataDriver:
         Returns:
             pd.DataFrame: A pandas DataFrame containing the data in response to the question.
         """
-        airesp = await self.__get_answer_object(subject,question,AIQuestionOutputTypeEnum.data.value)
+        airesp = await self.__get_answer_object(subject,question, generate_chart,AIQuestionOutputTypeEnum.data.value)
         if airesp is not None and hasattr(airesp, 'answerDataJson') and airesp.answerDataJson:
             return pd.read_json(StringIO(airesp.answerDataJson))
         else:
             self.logger.info("No answer data available.")
             return None
         
-    async def get_answer_and_data_frame(self, question: str, subject: Optional[str] = None) -> Optional[QuestionResponse]:
+    async def get_answer_and_data_frame(self, question: str, subject: Optional[str] = None, generate_chart: Optional[bool] = False) -> Optional[QuestionResponse]:
         """
         Returns a stext and pandas DataFrame response for a given question.
 
         Args:
             question (str): The question you want to ask.
             subject (str, optional): The subject you want to ask the question about. If None provided, copilot with choose the subject.
+            generate_chart (bool, optional): If True, the response will generate a chart. Default is False. (see https://developer.inmydata.com/a/solutions/articles/36000577995?portalId=36000061664)
 
         Raises:
             ai_question_update: This event is triggered when the AI question status is updated. The callback function will receive the instance of this class and a string containing the status message as parameters.
@@ -248,7 +264,7 @@ class ConversationalDataDriver:
         Returns:
             QuestionResponse: A structured response containing both a string and a pandas DataFrame.
         """
-        airesp = await self.__get_answer_object(subject,question,AIQuestionOutputTypeEnum.data.value)
+        airesp = await self.__get_answer_object(subject,question,generate_chart,AIQuestionOutputTypeEnum.data.value)
         if airesp is not None and hasattr(airesp, 'answerDataJson') and airesp.answerDataJson:
             return QuestionResponse(answer=airesp.answer, dataFrame=pd.read_json(StringIO(airesp.answerDataJson)), subject=airesp.subject)
         else:
@@ -279,8 +295,19 @@ class ConversationalDataDriver:
         else:
             raise ValueError("API key is not set. Please set the INMYDATA_API_KEY environment variable.")
         
-    async def __get_answer_object(self, subject,question,outputtype = AIQuestionOutputTypeEnum.text.value):
-        aireq = self._AIQuestionAPIRequest(subject,question,date.today().strftime("%m/%d/%Y"),Model.o3mini.value,outputtype,AITypeEnum.azureopenai.value, True, True, True)
+    async def __get_answer_object(self, subject,question,generate_chart,outputtype = AIQuestionOutputTypeEnum.text.value):
+        aireq = self._AIQuestionAPIRequest(
+            subject,
+            question,
+            date.today().strftime("%m/%d/%Y"),
+            Model.o3mini.value,
+            outputtype,AITypeEnum.azureopenai.value, 
+            True, 
+            True, 
+            True, 
+            generate_chart,
+            self.user,
+            self.session_id)
         self.logger.debug("AIQuestionAPIRequest")
         self.logger.debug(aireq.toJSON())
         x = await self.__post_request('https://' + self.tenant + '.' + self.server + '/api/developer/v1/ai/question', data=json.loads(aireq.toJSON()))
@@ -292,8 +319,8 @@ class ConversationalDataDriver:
             self.logger.warning("Unsuccessful request")
         return None
 
-    async def __get_answer(self, subject, question) -> Optional[Answer]:
-        airesp = await self.__get_answer_object(subject,question)
+    async def __get_answer(self, subject, question, generate_chart) -> Optional[Answer]:
+        airesp = await self.__get_answer_object(subject,question, generate_chart)
         if airesp is not None:
             self.logger.info("Answer received: " + airesp.answer)
             return Answer(answer=airesp.answer, subject=airesp.subject)
