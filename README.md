@@ -56,7 +56,7 @@ load_dotenv()
 
 driver = StructuredDataDriver(os.environ['INMYDATA_TENANT'])
 driver.user = "demo" # Events to display charts will be available to the user specified here
-driver.session_id = "test-session" # Session ID passed in the event to display charts. Can optionnally be used to only show charts for the current session
+driver.session_id = "test-session" # Session ID passed in the event to display charts. Can optionally be used to only show charts for the current session
 
 # -- Use get_data_simple when your filter is simple (only equality filters, no bracketing, no ORs, etc.)
 
