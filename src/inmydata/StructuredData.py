@@ -158,6 +158,37 @@ class AIDataSimpleFilter:
             "Field": self.Field,
             "Value": self.Value
         }
+    
+class TopNOption:
+    """ 
+    A class representing a Top N filter for querying data in the inmydata platform.
+    This class encapsulates the details of a Top N filter, including the metric field to calculated the value to filter on, and the number of top or bottom items to return.
+    
+    Attributes:
+        MetricField (str): The field to filter on.
+        NumberOfResults (int): The number of top or bottom items to return. Positive numbers indicate top N, negative numbers indicate bottom N.
+    """
+    def __init__(self, MetricField:str, NumberOfResults:int):
+        """
+        Initializes the TopNUsed with the specified metric field and number of top or bottom items.
+
+        Args:
+            MetricField (str): The field to filter on.
+            NumberOfResults (int): The number of top items to return.
+        """
+        self.MetricField = MetricField
+        self.NumberOfResults = NumberOfResults
+    def to_dict(self):
+        """
+        Converts the TopNUsed instance to a dictionary representation.
+
+        Returns:
+            dict: A dictionary representation of the TopNUsed instance.
+        """
+        return {
+            "MetricField": self.MetricField,
+            "NumberOfResults": self.NumberOfResults
+        }
 
 class StructuredDataDriver:
     """ 
@@ -174,15 +205,17 @@ class StructuredDataDriver:
         log_file (Optional[str]): The file to log messages to, if None, logs will be printed to the console.
     """
     class _AIDataAPIRequest:
-        def __init__(self, Subject: str, Fields: list[str], Filters: list['AIDataFilter']):      
+        def __init__(self, Subject: str, Fields: list[str], Filters: list['AIDataFilter'], TopNUsed: dict['str', 'TopNOption']):
             self.Subject = Subject
             self.Fields = Fields
             self.Filters = Filters  # List of AIDataFilterUsed
+            self.TopNUsed = TopNUsed
         def to_dict(self):
             return {
                 "Subject": self.Subject,
                 "Fields": self.Fields,
-                "Filters": [f.to_dict() for f in self.Filters]
+                "Filters": [f.to_dict() for f in self.Filters],
+                "TopNUsed": {k: v.to_dict() for k, v in self.TopNUsed.items()} 
             }
 
     class _AIDataAPIResponse:
@@ -195,7 +228,7 @@ class StructuredDataDriver:
           return json.dumps(self, default=lambda o: o.__dict__, sort_keys=True, indent=4)
         
     class _AIChartAPIRequest:
-        def __init__(self,Subject,RowFields,ColumnsFields,MetricFields,Filters,ChartType,Caption,User,SessionID):      
+        def __init__(self,Subject,RowFields,ColumnsFields,MetricFields,Filters,ChartType,Caption,User,SessionID,TopNUsed):
           self.Subject = Subject
           self.RowFields = RowFields
           self.ColumnFields = ColumnsFields
@@ -205,6 +238,7 @@ class StructuredDataDriver:
           self.User = User
           self.Caption = Caption
           self.SessionID = SessionID
+          self.TopNUsed = TopNUsed
         def to_dict(self):
             return {
                 "Subject": self.Subject,
@@ -215,7 +249,8 @@ class StructuredDataDriver:
                 "ChartType": self.ChartType.name.lower(),  
                 "User": self.User,
                 "Caption": self.Caption,
-                "SessionID": self.SessionID
+                "SessionID": self.SessionID,
+                "TopNUsed": {k: v.to_dict() for k, v in self.TopNUsed.items()} 
             }
         
     class _AIChartAPIResponse:
@@ -271,19 +306,59 @@ class StructuredDataDriver:
 
         pass
 
-    def get_data(self, subject: str, fields: list[str], filters: list[AIDataFilter]):
+    def get_user(self):
+        """ 
+        Returns the user for whom the driver is initialized.
+        
+        Returns:
+            Optional[str]: The user for whom the driver is initialized, or None if no user is set.
+        """
+        return self.user
+    
+    def set_user(self, user: str):
+        """ 
+        Sets the user for whom the driver is initialized.
+        
+        Args:
+            user (str): The user to set for the driver.
+        """
+        self.user = user
+        self.logger.info(f"User set to {user}")
+    
+    def get_session_id(self):
+        """ 
+        Returns the session ID for the driver.
+        
+        Returns:
+            Optional[str]: The session ID for the driver, or None if no session ID is set.
+        """
+        return self.session_id
+
+    def set_session_id(self, session_id: str):
+        """ 
+        Sets the session ID for the driver.
+        
+        Args:
+            session_id (str): The session ID to set for the driver.
+        """
+        self.session_id = session_id
+        self.logger.info(f"Session ID set to {session_id}")
+
+    def get_data(self, subject: str, fields: list[str], filters: list[AIDataFilter],TopNUsed: Optional[dict['str', 'TopNOption']] = None) -> pd.DataFrame | None:
             """ Retrieves data from the inmydata platform based on the specified subject, fields, and filters.
 
             Args:
                 subject (str): The subject to query data from.
                 fields (list[str]): The list of fields to retrieve.
                 filters (list[AIDataFilter]): The list of filters to apply to the query.
-            
+                TopNUsed (Optional[dict['str', 'TopNOption']]): Optional dictionary of Top N filters to apply to the query. Defaults to None. They key of the dictionary is the name of the column the top N filter will be applied to.
             Returns:
                 pd.DataFrame: A pandas DataFrame containing the retrieved data.
             """
             result = None
-            aidatareq = self._AIDataAPIRequest(subject,fields,filters)
+            if TopNUsed is None:
+                TopNUsed = {}
+            aidatareq = self._AIDataAPIRequest(subject,fields,filters,TopNUsed)
             input_json_string  = jsonpickle.encode(aidatareq.to_dict(), unpicklable=False)
             self.logger.info("Executing " + str(input_json_string))
             if input_json_string is None:
@@ -313,7 +388,13 @@ class StructuredDataDriver:
                     result = pd.read_csv(filepath_or_buffer = data)
             return result
 
-    def get_data_simple(self,subject:str,fields:list[str],simplefilters:list[AIDataSimpleFilter], caseSensitive: Optional[bool] = True):
+    def get_data_simple(
+            self,
+            subject:str,
+            fields:list[str],
+            simplefilters:list[AIDataSimpleFilter], 
+            caseSensitive: Optional[bool] = True, 
+            TopNUsed: Optional[dict['str', 'TopNOption']] = None) -> pd.DataFrame | None:
             """ 
             Retrieves data from the inmydata platform based on the specified subject, fields, and simple filters.
             
@@ -322,6 +403,7 @@ class StructuredDataDriver:
                 fields (list[str]): The list of fields to retrieve.
                 simplefilters (list[AIDataSimpleFilter]): The list of simple filters to apply to the query.
                 caseSensitive (Optional[bool]): Whether the filter should be case sensitive. Defaults to True.
+                TopNUsed (Optional[dict['str', 'TopNOption']]): Optional dictionary of Top N filters to apply to the query. Defaults to None. They key of the dictionary is the name of the column the top N filter will be applied to.
             
             Returns:
                 pd.DataFrame: A pandas DataFrame containing the retrieved data.
@@ -332,9 +414,18 @@ class StructuredDataDriver:
             for simpleFilter in simplefilters:           
               filter = AIDataFilter(Field=simpleFilter.Field,ConditionOperator=ConditionOperator.Equals,LogicalOperator=LogicalOperator.And,Value=simpleFilter.Value,StartGroup=0,EndGroup=0, CaseInsensitive=case_insensitive)
               filters.append(filter)
-            return self.get_data(subject,fields,filters)
+            return self.get_data(subject,fields,filters,TopNUsed)
     
-    def get_chart(self,subject:str,rowfields:list[str],columnfields:list[str],metricfields:list[str],filters:list[AIDataFilter],charttype:ChartType,caption:str):
+    def get_chart(
+            self,
+            subject:str,
+            rowfields:list[str],
+            columnfields:list[str],
+            metricfields:list[str],
+            filters:list[AIDataFilter],
+            charttype:ChartType,
+            caption:str, 
+            TopNUsed: Optional[dict['str', 'TopNOption']] = None):
         """
         Generates a chart based on the specified subject, row fields, column fields, metric fields, 
         filters, chart type, user, and caption. For details on showing charts in your app, see https://developer.inmydata.com/a/solutions/articles/36000577995?portalId=36000061664
@@ -347,12 +438,13 @@ class StructuredDataDriver:
             filters (list[AIDataFilter]): The list of filters to apply to the query.
             charttype (ChartType): The type of chart to generate.
             caption (str): The caption for the chart.
+            TopNUsed (Optional[dict['str', 'TopNOption']]): Optional dictionary of Top N filters to apply to the query. Defaults to None. They key of the dictionary is the name of the column the top N filter will be applied to.
 
         Returns:
             str: The ID of the generated visualisation.
         """
         result = None
-        aichartreq = self._AIChartAPIRequest(subject,rowfields,columnfields,metricfields,filters,charttype,self.user,caption,self.session_id)
+        aichartreq = self._AIChartAPIRequest(subject,rowfields,columnfields,metricfields,filters,charttype,caption,self.user,self.session_id,TopNUsed)
         input_json_string  = jsonpickle.encode(aichartreq.to_dict(), unpicklable=False)
         if input_json_string is None:
             raise ValueError("input_json_string is None and cannot be loaded as JSON")

@@ -31,4 +31,5 @@ To install::
    Model
    QuestionResponse
    StructuredDataDriver
+   TopNOption
 

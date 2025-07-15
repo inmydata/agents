@@ -207,6 +207,44 @@ class ConversationalDataDriver:
         self.logger.info("ConversationalDataDriver initialized.")
         pass
 
+    def get_user(self):
+        """ 
+        Returns the user. The user is used to identify the user when generating a chart (see https://developer.inmydata.com/a/solutions/articles/36000577995?portalId=36000061664).
+        
+        Returns:
+            Optional[str]: The user, or None if no user is set.
+        """
+        return self.user
+    
+    def set_user(self, user: str):
+        """ 
+        Sets the user for the driver.
+        
+        Args:
+            user (str): The user to set for the driver. The user is used to identify the user when generating a chart (see https://developer.inmydata.com/a/solutions/articles/36000577995?portalId=36000061664).
+        """
+        self.user = user
+        self.logger.info(f"User set to {user}")
+    
+    def get_session_id(self):
+        """ 
+        Returns the session ID for the driver.
+        
+        Returns:
+            Optional[str]: The session ID for the driver, or None if no session ID is set. The session ID is used to identify the session when generating a chart (see https://developer.inmydata.com/a/solutions/articles/36000577995?portalId=36000061664).
+        """
+        return self.session_id
+
+    def set_session_id(self, session_id: str):
+        """ 
+        Sets the session ID for the driver.
+        
+        Args:
+            session_id (str): The session ID to set for the driver. The session ID is used to identify the session when generating a chart (see https://developer.inmydata.com/a/solutions/articles/36000577995?portalId=36000061664).
+        """
+        self.session_id = session_id
+        self.logger.info(f"Session ID set to {session_id}")
+
     async def get_answer(self, question: str, subject: Optional[str] = None, generate_chart: Optional[bool] = False) -> Answer:
         """
         Returns a text response for a given question.
