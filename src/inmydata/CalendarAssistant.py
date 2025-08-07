@@ -8,9 +8,10 @@ import os
 import json
 import requests
 import jsonpickle
-from datetime import date
+from datetime import date, datetime
 import logging
 from typing import Optional
+from enum import Enum
    
 class FinancialPeriodDetails:
     """
@@ -30,6 +31,35 @@ class FinancialPeriodDetails:
         self.quarter = quarter
     def __repr__(self):
         return f"FinancialPeriodDetails(year={self.year}, month={self.month}, week={self.week}, quarter={self.quarter})"
+    
+class CalendarPeriodType(Enum):
+    """Enum for different calendar period types.
+    This enum defines the types of financial periods.
+
+    Attributes:
+        year (int): Represents the financial year.
+        month (int): Represents the financial month.
+        quarter (int): Represents the financial quarter.
+        week (int): Represents the financial week.
+    """
+    year = 1
+    month = 2
+    quarter = 3
+    week = 4
+
+class CalendarPeriodDateRange:
+    """A structure class for passing calendar period date ranges.
+    It contains the start and end dates of a calendar period.
+    
+    Attributes:
+        StartDate (date): The start date of the calendar period.
+        EndDate (date): The end date of the calendar period.
+    """
+    def __init__(self, StartDate: date, EndDate: date):      
+      self.StartDate = StartDate
+      self.EndDate = EndDate
+    def toJSON(self):
+      return json.dumps(self, default=lambda o: o.__dict__, sort_keys=True, indent=4)
 
 class CalendarAssistant:
     """
@@ -91,6 +121,20 @@ class CalendarAssistant:
             # Convert date to string for JSON serialization
             self.date = self.date.isoformat() if isinstance(self.date, date) else self.date
             return json.dumps(self, default=lambda o: o.__dict__, sort_keys=True, indent=4)
+        
+    class _GetCalendarPeriodDateRangeRequest:
+        def __init__(self,PeriodType:CalendarPeriodType,Year:int,PeriodNumber:int,CalendarName:str):      
+          self.PeriodType = PeriodType
+          self.Year = Year
+          self.PeriodNumber = PeriodNumber
+          self.CalendarName = CalendarName
+        def to_dict(self):
+            return {
+                "PeriodType": self.PeriodType.value,
+                "Year": self.Year,
+                "PeriodNumber": self.PeriodNumber,
+                "CalendarName": self.CalendarName
+            }
 
     def __init__(self, tenant: str, calendar_name: str, server: str = "inmydata.com", logging_level=logging.INFO, log_file: Optional[str] = None ):
         """
@@ -208,6 +252,40 @@ class CalendarAssistant:
         if cd is None:
             raise ValueError("Calendar details not found for the given date.")
         return cd.dateDetails.month
+
+    def get_calendar_period_date_range(self, year: int, periodnumber: int, periodtype: CalendarPeriodType) -> CalendarPeriodDateRange | None:
+        """
+        Returns the start and end dates of a calendar period based on the specified year, period number, and period type.
+
+        Args:
+            year (int): The year of the calendar period.
+            periodnumber (int): The number of the period within the specified type (e.g., quarter number, month number, week number).
+            periodtype (CalendarPeriodType): The type of calendar period (year, month, quarter, week).
+            
+        Returns:
+            CalendarPeriodDateRange | None: An object containing the start and end dates of the calendar period, or None if not found.
+        """
+        result = None
+        calreq = self._GetCalendarPeriodDateRangeRequest(periodtype,year,periodnumber,self.calendar_name)
+        input_json_string  = jsonpickle.encode(calreq.to_dict(), unpicklable=False)
+        if input_json_string is None:
+            raise ValueError("input_json_string is None and cannot be loaded as JSON")
+        myobj = json.loads(input_json_string)
+        headers = {'Authorization': 'Bearer ' + self.__get_auth_token(),
+                'Content-Type': 'application/json'}
+        url = 'https://' + self.tenant + '.' + self.server + '/api/developer/v1/ai/getcalendarperiodrange'
+        x = requests.post(url, json=myobj,headers=headers)
+        if x.status_code == 200 and x.text:
+            value = jsonpickle.decode(x.text).get("value")
+            if value is not None:
+                encoded_value = jsonpickle.encode(value)
+                if encoded_value is not None:
+                    rangedict = json.loads(encoded_value)
+                    result = CalendarPeriodDateRange(
+                        datetime.fromisoformat(rangedict["startDate"]).date(),
+                        datetime.fromisoformat(rangedict["endDate"]).date()
+                    )
+        return result
 
     def __get_auth_token(self):        
         return os.environ['INMYDATA_API_KEY'] 

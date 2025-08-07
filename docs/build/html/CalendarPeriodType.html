@@ -2,10 +2,12 @@
 <html class="no-js" lang="en" data-content_root="./">
   <head><meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width,initial-scale=1"/>
-    <meta name="color-scheme" content="light dark"><link rel="index" title="Index" href="#" /><link rel="search" title="Search" href="search.html" />
+    <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" /><link rel="next" title="ChartType" href="ChartType.html" /><link rel="prev" title="CalendarPeriodDateRange" href="CalendarPeriodDateRange.html" />
 
-    <link rel="shortcut icon" href="_static/favicon.ico"/><!-- Generated with Sphinx 8.1.3 and Furo 2024.08.06 --><title>Index - agents API reference (0.0.16)</title>
-<link rel="stylesheet" type="text/css" href="_static/pygments.css?v=a746c00c" />
+    <link rel="shortcut icon" href="_static/favicon.ico"/><!-- Generated with Sphinx 8.1.3 and Furo 2024.08.06 -->
+        <title>CalendarPeriodType - agents API reference (0.0.16)</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=a746c00c" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=354aac6f" />
     <link rel="stylesheet" type="text/css" href="_static/custom.css?v=1e8d618a" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=302659d7" />
@@ -203,7 +205,7 @@
 </form>
 <div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
   <p class="caption" role="heading"><span class="caption-text">Classes:</span></p>
-<ul>
+<ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="AIDataFilter.html">AIDataFilter</a></li>
 <li class="toctree-l1"><a class="reference internal" href="AIDataSimpleFilter.html">AIDataSimpleFilter</a></li>
 <li class="toctree-l1"><a class="reference internal" href="AIQuestionOutputTypeEnum.html">AIQuestionOutputTypeEnum</a></li>
@@ -211,7 +213,7 @@
 <li class="toctree-l1"><a class="reference internal" href="Answer.html">Answer</a></li>
 <li class="toctree-l1"><a class="reference internal" href="CalendarAssistant.html">CalendarAssistant</a></li>
 <li class="toctree-l1"><a class="reference internal" href="CalendarPeriodDateRange.html">CalendarPeriodDateRange</a></li>
-<li class="toctree-l1"><a class="reference internal" href="CalendarPeriodType.html">CalendarPeriodType</a></li>
+<li class="toctree-l1 current current-page"><a class="current reference internal" href="#">CalendarPeriodType</a></li>
 <li class="toctree-l1"><a class="reference internal" href="ChartType.html">ChartType</a></li>
 <li class="toctree-l1"><a class="reference internal" href="ConditionOperator.html">ConditionOperator</a></li>
 <li class="toctree-l1"><a class="reference internal" href="ConversationalDataDriver.html">ConversationalData</a></li>
@@ -240,7 +242,13 @@
           <span>Back to top</span>
         </a>
         <div class="content-icon-container">
-          <div class="theme-toggle-container theme-toggle-content">
+          <div class="view-this-page">
+  <a class="muted-link" href="_sources/CalendarPeriodType.rst.txt" title="View this page">
+    <svg><use href="#svg-eye"></use></svg>
+    <span class="visually-hidden">View this page</span>
+  </a>
+</div>
+<div class="theme-toggle-container theme-toggle-content">
             <button class="theme-toggle">
               <div class="visually-hidden">Toggle Light / Dark / Auto color theme</div>
               <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
@@ -255,10 +263,80 @@
           </label>
         </div>
         <article role="main" id="furo-main-content">
-          
-<section class="genindex-section">
-  <h1 id="index">Index</h1>
-  <div class="genindex-jumpbox"></div>
+          <section id="calendarperiodtype">
+<h1>CalendarPeriodType<a class="headerlink" href="#calendarperiodtype" title="Link to this heading">¶</a></h1>
+<dl class="py class">
+<dt class="sig sig-object py">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">inmydata.CalendarAssistant.</span></span><span class="sig-name descname"><span class="pre">CalendarPeriodType</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Enum</span></code></p>
+<p>Enum for different calendar period types.
+This enum defines the types of financial periods.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">year</span></span></dt>
+<dd><p>Represents the financial year.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">month</span></span></dt>
+<dd><p>Represents the financial month.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">quarter</span></span></dt>
+<dd><p>Represents the financial quarter.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">week</span></span></dt>
+<dd><p>Represents the financial week.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">month</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">2</span></em></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">quarter</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">3</span></em></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">week</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">4</span></em></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">year</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1</span></em></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
 </section>
 
         </article>
@@ -266,8 +344,26 @@
       <footer>
         
         <div class="related-pages">
-          
-          
+          <a class="next-page" href="ChartType.html">
+              <div class="page-info">
+                <div class="context">
+                  <span>Next</span>
+                </div>
+                <div class="title">ChartType</div>
+              </div>
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+            </a>
+          <a class="prev-page" href="CalendarPeriodDateRange.html">
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+              <div class="page-info">
+                <div class="context">
+                  <span>Previous</span>
+                </div>
+                
+                <div class="title">CalendarPeriodDateRange</div>
+                
+              </div>
+            </a>
         </div>
         <div class="bottom-of-page">
           <div class="left-details">

@@ -3,10 +3,10 @@
   <head><meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width,initial-scale=1"/>
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" /><link rel="next" title="ChartType" href="ChartType.html" /><link rel="prev" title="Answer" href="Answer.html" />
+<link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" /><link rel="next" title="CalendarPeriodDateRange" href="CalendarPeriodDateRange.html" /><link rel="prev" title="Answer" href="Answer.html" />
 
     <link rel="shortcut icon" href="_static/favicon.ico"/><!-- Generated with Sphinx 8.1.3 and Furo 2024.08.06 -->
-        <title>CalendarAssistant - agents API reference (0.0.15)</title>
+        <title>CalendarAssistant - agents API reference (0.0.16)</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=a746c00c" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=354aac6f" />
     <link rel="stylesheet" type="text/css" href="_static/custom.css?v=1e8d618a" />
@@ -169,7 +169,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">agents API reference (0.0.15)</div></a>
+      <a href="index.html"><div class="brand">agents API reference (0.0.16)</div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -196,7 +196,7 @@
     <img class="sidebar-logo" src="_static/logo.png" alt="Logo"/>
   </div>
   
-  <span class="sidebar-brand-text">agents API reference (0.0.15)</span>
+  <span class="sidebar-brand-text">agents API reference (0.0.16)</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -212,6 +212,8 @@
 <li class="toctree-l1"><a class="reference internal" href="AITypeEnum.html">AITypeEnum</a></li>
 <li class="toctree-l1"><a class="reference internal" href="Answer.html">Answer</a></li>
 <li class="toctree-l1 current current-page"><a class="current reference internal" href="#">CalendarAssistant</a></li>
+<li class="toctree-l1"><a class="reference internal" href="CalendarPeriodDateRange.html">CalendarPeriodDateRange</a></li>
+<li class="toctree-l1"><a class="reference internal" href="CalendarPeriodType.html">CalendarPeriodType</a></li>
 <li class="toctree-l1"><a class="reference internal" href="ChartType.html">ChartType</a></li>
 <li class="toctree-l1"><a class="reference internal" href="ConditionOperator.html">ConditionOperator</a></li>
 <li class="toctree-l1"><a class="reference internal" href="ConversationalDataDriver.html">ConversationalData</a></li>
@@ -345,6 +347,27 @@ It uses the inmydata API to fetch calendar details and returns them in a structu
 
 <dl class="py method">
 <dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">get_calendar_period_date_range</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">year</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">periodnumber</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">periodtype</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">CalendarPeriodType</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">CalendarPeriodDateRange</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></span></dt>
+<dd><p>Returns the start and end dates of a calendar period based on the specified year, period number, and period type.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>year</strong> (<em>int</em>) – The year of the calendar period.</p></li>
+<li><p><strong>periodnumber</strong> (<em>int</em>) – The number of the period within the specified type (e.g., quarter number, month number, week number).</p></li>
+<li><p><strong>periodtype</strong> (<em>CalendarPeriodType</em>) – The type of calendar period (year, month, quarter, week).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>An object containing the start and end dates of the calendar period, or None if not found.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>CalendarPeriodDateRange | None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py">
 <span class="sig-name descname"><span class="pre">get_financial_periods</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">input_date</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">date</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">FinancialPeriodDetails</span></span></span></dt>
 <dd><p>Returns the financial periods (year, month, week, quarter) for the given date.</p>
 <dl class="field-list simple">
@@ -438,12 +461,12 @@ It uses the inmydata API to fetch calendar details and returns them in a structu
       <footer>
         
         <div class="related-pages">
-          <a class="next-page" href="ChartType.html">
+          <a class="next-page" href="CalendarPeriodDateRange.html">
               <div class="page-info">
                 <div class="context">
                   <span>Next</span>
                 </div>
-                <div class="title">ChartType</div>
+                <div class="title">CalendarPeriodDateRange</div>
               </div>
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
             </a>
@@ -482,7 +505,7 @@ It uses the inmydata API to fetch calendar details and returns them in a structu
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=f0357c94"></script>
+</div><script src="_static/documentation_options.js?v=c7cdf6fe"></script>
     <script src="_static/doctools.js?v=9bcbadda"></script>
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="_static/scripts/furo.js?v=5fa4622c"></script>

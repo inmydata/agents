@@ -2,10 +2,12 @@
 <html class="no-js" lang="en" data-content_root="./">
   <head><meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width,initial-scale=1"/>
-    <meta name="color-scheme" content="light dark"><link rel="index" title="Index" href="#" /><link rel="search" title="Search" href="search.html" />
+    <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" /><link rel="next" title="CalendarPeriodType" href="CalendarPeriodType.html" /><link rel="prev" title="CalendarAssistant" href="CalendarAssistant.html" />
 
-    <link rel="shortcut icon" href="_static/favicon.ico"/><!-- Generated with Sphinx 8.1.3 and Furo 2024.08.06 --><title>Index - agents API reference (0.0.16)</title>
-<link rel="stylesheet" type="text/css" href="_static/pygments.css?v=a746c00c" />
+    <link rel="shortcut icon" href="_static/favicon.ico"/><!-- Generated with Sphinx 8.1.3 and Furo 2024.08.06 -->
+        <title>CalendarPeriodDateRange - agents API reference (0.0.16)</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=a746c00c" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=354aac6f" />
     <link rel="stylesheet" type="text/css" href="_static/custom.css?v=1e8d618a" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=302659d7" />
@@ -203,14 +205,14 @@
 </form>
 <div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
   <p class="caption" role="heading"><span class="caption-text">Classes:</span></p>
-<ul>
+<ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="AIDataFilter.html">AIDataFilter</a></li>
 <li class="toctree-l1"><a class="reference internal" href="AIDataSimpleFilter.html">AIDataSimpleFilter</a></li>
 <li class="toctree-l1"><a class="reference internal" href="AIQuestionOutputTypeEnum.html">AIQuestionOutputTypeEnum</a></li>
 <li class="toctree-l1"><a class="reference internal" href="AITypeEnum.html">AITypeEnum</a></li>
 <li class="toctree-l1"><a class="reference internal" href="Answer.html">Answer</a></li>
 <li class="toctree-l1"><a class="reference internal" href="CalendarAssistant.html">CalendarAssistant</a></li>
-<li class="toctree-l1"><a class="reference internal" href="CalendarPeriodDateRange.html">CalendarPeriodDateRange</a></li>
+<li class="toctree-l1 current current-page"><a class="current reference internal" href="#">CalendarPeriodDateRange</a></li>
 <li class="toctree-l1"><a class="reference internal" href="CalendarPeriodType.html">CalendarPeriodType</a></li>
 <li class="toctree-l1"><a class="reference internal" href="ChartType.html">ChartType</a></li>
 <li class="toctree-l1"><a class="reference internal" href="ConditionOperator.html">ConditionOperator</a></li>
@@ -240,7 +242,13 @@
           <span>Back to top</span>
         </a>
         <div class="content-icon-container">
-          <div class="theme-toggle-container theme-toggle-content">
+          <div class="view-this-page">
+  <a class="muted-link" href="_sources/CalendarPeriodDateRange.rst.txt" title="View this page">
+    <svg><use href="#svg-eye"></use></svg>
+    <span class="visually-hidden">View this page</span>
+  </a>
+</div>
+<div class="theme-toggle-container theme-toggle-content">
             <button class="theme-toggle">
               <div class="visually-hidden">Toggle Light / Dark / Auto color theme</div>
               <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
@@ -255,10 +263,51 @@
           </label>
         </div>
         <article role="main" id="furo-main-content">
-          
-<section class="genindex-section">
-  <h1 id="index">Index</h1>
-  <div class="genindex-jumpbox"></div>
+          <section id="calendarperioddaterange">
+<h1>CalendarPeriodDateRange<a class="headerlink" href="#calendarperioddaterange" title="Link to this heading">¶</a></h1>
+<dl class="py class">
+<dt class="sig sig-object py">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">inmydata.CalendarAssistant.</span></span><span class="sig-name descname"><span class="pre">CalendarPeriodDateRange</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">StartDate</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">EndDate</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">date</span></span></em><span class="sig-paren">)</span></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>A structure class for passing calendar period date ranges.
+It contains the start and end dates of a calendar period.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">StartDate</span></span></dt>
+<dd><p>The start date of the calendar period.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>date</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">EndDate</span></span></dt>
+<dd><p>The end date of the calendar period.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>date</p>
+</dd>
+</dl>
+</dd></dl>
+
+<section id="members">
+<h2>Members<a class="headerlink" href="#members" title="Link to this heading">¶</a></h2>
+<dl class="py method">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">StartDate</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">EndDate</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">date</span></span></em><span class="sig-paren">)</span></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">toJSON</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span></dt>
+<dd></dd></dl>
+
+</section>
+</dd></dl>
+
 </section>
 
         </article>
@@ -266,8 +315,26 @@
       <footer>
         
         <div class="related-pages">
-          
-          
+          <a class="next-page" href="CalendarPeriodType.html">
+              <div class="page-info">
+                <div class="context">
+                  <span>Next</span>
+                </div>
+                <div class="title">CalendarPeriodType</div>
+              </div>
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+            </a>
+          <a class="prev-page" href="CalendarAssistant.html">
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+              <div class="page-info">
+                <div class="context">
+                  <span>Previous</span>
+                </div>
+                
+                <div class="title">CalendarAssistant</div>
+                
+              </div>
+            </a>
         </div>
         <div class="bottom-of-page">
           <div class="left-details">

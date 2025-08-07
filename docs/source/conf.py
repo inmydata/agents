@@ -9,7 +9,7 @@
 project = 'agents'
 copyright = '2025, DataPA Limited'
 author = 'DataPA Limited'
-release = '0.0.15'
+release = '0.0.16'
 
 import os
 import sys
