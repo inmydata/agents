@@ -67,11 +67,18 @@ class CalendarAssistant:
     It uses the inmydata API to fetch calendar details and returns them in a structured format.
     
     Attributes:
-        tenant (str): The tenant identifier for the inmydata platform.
-        calendar_name (str): The name of the calendar to use for financial periods.
-        server (str): The server address for the inmydata platform, default is "inmydata.com".
-        logging_level (int): The logging level for the logger, default is logging.INFO.
-        log_file (Optional[str]): The file to log messages to, if None, logs to console.
+        tenant (str): 
+            The tenant identifier for the inmydata platform.
+        calendar_name (str): 
+            The name of the calendar to use for financial periods.
+        server (str): 
+            The server address for the inmydata platform, default is "inmydata.com". 
+        api_key (Optional[str]): 
+            The API key for authenticating with the inmydata platform. If None, it will attempt to read from the environment variable 'INMYDATA_API_KEY'. 
+        logging_level (int): 
+            The logging level for the logger, default is logging.INFO.
+        log_file (Optional[str]): 
+            The file to log messages to, if None, logs to console.
     """
 
     class _GetCalendarDetailsRequest:
@@ -136,17 +143,24 @@ class CalendarAssistant:
                 "CalendarName": self.CalendarName
             }
 
-    def __init__(self, tenant: str, calendar_name: str, server: str = "inmydata.com", logging_level=logging.INFO, log_file: Optional[str] = None ):
+    def __init__(self, tenant: str, calendar_name: str, server: str = "inmydata.com", api_key: Optional[str] = None, logging_level=logging.INFO, log_file: Optional[str] = None ):
         """
         Initializes the CalendarAssistant with the specified tenant, calendar name, server, logging level, and optional log file.
         
         
         Args:            
-            tenant (str): The tenant identifier for the inmydata platform.
-            calendar_name (str): The name of the calendar to use for financial periods.
-            server (str): The server address for the inmydata platform, default is "inmydata.com".  
-            logging_level (int): The logging level for the logger, default is logging.INFO.
-            log_file (Optional[str]): The file to log messages to, if None, logs to console.
+            tenant (str): 
+                The tenant identifier for the inmydata platform.
+            calendar_name (str): 
+                The name of the calendar to use for financial periods.
+            server (str): 
+                The server address for the inmydata platform, default is "inmydata.com". 
+            api_key (Optional[str]): 
+                The API key for authenticating with the inmydata platform. If None, it will attempt to read from the environment variable 'INMYDATA_API_KEY'. 
+            logging_level (int): 
+                The logging level for the logger, default is logging.INFO.
+            log_file (Optional[str]): 
+                The file to log messages to, if None, logs to console.
         """
         self.tenant = tenant
         self.calendar_name = calendar_name
@@ -170,11 +184,14 @@ class CalendarAssistant:
 
         self.logger.propagate = False  # Prevent propagation to the root logger
         
-        try:
-           self.api_key = os.environ['INMYDATA_API_KEY']
-        except KeyError:
-           self.api_key = ""
-           self.logger.warning("Environment variable INMYDATA_API_KEY not set. API requests to the inmydata platform will fail.")
+        if api_key:
+            self.api_key = api_key
+        else:
+            try:
+               self.api_key = os.environ['INMYDATA_API_KEY']
+            except KeyError:
+               self.api_key = ""
+               self.logger.warning("Environment variable INMYDATA_API_KEY not set. API requests to the inmydata platform will fail.")
 
         self.logger.info("CalendarAssistant initialized.")
 
@@ -276,15 +293,14 @@ class CalendarAssistant:
         url = 'https://' + self.tenant + '.' + self.server + '/api/developer/v1/ai/getcalendarperiodrange'
         x = requests.post(url, json=myobj,headers=headers)
         if x.status_code == 200 and x.text:
-            value = jsonpickle.decode(x.text).get("value")
+            response_json = json.loads(x.text)
+            value = response_json.get("value")
             if value is not None:
-                encoded_value = jsonpickle.encode(value)
-                if encoded_value is not None:
-                    rangedict = json.loads(encoded_value)
-                    result = CalendarPeriodDateRange(
-                        datetime.fromisoformat(rangedict["startDate"]).date(),
-                        datetime.fromisoformat(rangedict["endDate"]).date()
-                    )
+                rangedict = value
+                result = CalendarPeriodDateRange(
+                    datetime.fromisoformat(rangedict["startDate"]).date(),
+                    datetime.fromisoformat(rangedict["endDate"]).date()
+                )
         return result
 
     def __get_auth_token(self):        

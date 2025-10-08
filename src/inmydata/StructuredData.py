@@ -9,6 +9,8 @@ import gzip
 from enum import Enum
 import logging
 from typing import Optional
+from typing import Optional, List, Dict, Any
+from datetime import datetime
 
 class ConditionOperator(Enum):
    """
@@ -197,12 +199,20 @@ class StructuredDataDriver:
     It uses the inmydata API to fetch data and returns it as a pandas DataFrame.
     
     Attributes:
-        tenant (str): The tenant identifier for the inmydata platform.
-        server (str): The server address for the inmydata platform, default is "inmydata.com".
-        user (Optional[str]): The user for whom the driver is initialized, if None, no user is set. Useful to identify the user when generating a chart (see https://developer.inmydata.com/a/solutions/articles/36000577995?portalId=36000061664).
-        session_id (Optional[str]): The session ID for the driver, if None, no session ID is set. Useful to identify the session when generating a chart (see https://developer.inmydata.com/a/solutions/articles/36000577995?portalId=36000061664).
-        logging_level (Optional[int]): The logging level for the logger, default is logging.INFO.
-        log_file (Optional[str]): The file to log messages to, if None, logs will be printed to the console.
+        tenant (str): 
+            The tenant identifier for the inmydata platform.
+        server (str): 
+            The server address for the inmydata platform, default is "inmydata.com".
+        user (Optional[str]): 
+            The user for whom the driver is initialized, if None, no user is set. Useful to identify the user when generating a chart (see https://developer.inmydata.com/a/solutions/articles/36000577995?portalId=36000061664).
+        session_id (Optional[str]): 
+            The session ID for the driver, if None, no session ID is set. Useful to identify the session when generating a chart (see https://developer.inmydata.com/a/solutions/articles/36000577995?portalId=36000061664).
+        api_key (Optional[str]): 
+                The API key for authenticating with the inmydata platform. If None, it will attempt to read from the environment variable 'INMYDATA_API_KEY'.
+        logging_level (Optional[int]): 
+            The logging level for the logger, default is logging.INFO.
+        log_file (Optional[str]): 
+            The file to log messages to, if None, logs will be printed to the console.
     """
     class _AIDataAPIRequest:
         def __init__(self, Subject: str, Fields: list[str], Filters: list['AIDataFilter'], TopNUsed: dict['str', 'TopNOption']):
@@ -259,17 +269,25 @@ class StructuredDataDriver:
         def toJSON(self):
           return json.dumps(self, default=lambda o: o.__dict__, sort_keys=True, indent=4)
 
-    def __init__(self, tenant: str, server:str ="inmydata.com", user: Optional[str] = None, session_id: Optional[str] = None,  logging_level: Optional[int] = logging.INFO, log_file: Optional[str] = None ):
+    def __init__(self, tenant: str, server:str ="inmydata.com", user: Optional[str] = None, session_id: Optional[str] = None,  api_key: Optional[str] = None, logging_level: Optional[int] = logging.INFO, log_file: Optional[str] = None ):
         """
         Initializes the StructuredDataDriver with the specified tenant, server, logging level, and log file.
         
         Args:
-            tenant (str): The tenant identifier for the inmydata platform.      
-            server (str): The server address for the inmydata platform, default is "inmydata.com".  
-            user (Optional[str]): The user for whom the driver is initialized, if None, no user is set. Useful to identify the user when generating a chart.
-            session_id (Optional[str]): The session ID for the driver, if None, no session ID is set. Useful to identify the session when generating a chart.
-            logging_level (int): The logging level for the logger, default is logging.INFO.
-            log_file (Optional[str]): The file to log messages to, if None, logs will be printed to the console.
+            tenant (str): 
+                The tenant identifier for the inmydata platform.      
+            server (str): 
+                The server address for the inmydata platform, default is "inmydata.com".  
+            user (Optional[str]): 
+                The user for whom the driver is initialized, if None, no user is set. Useful to identify the user when generating a chart (see https://developer.inmydata.com/a/solutions/articles/36000577995?portalId=36000061664).
+            session_id (Optional[str]): 
+                The session ID for the driver, if None, no session ID is set. Useful to identify the session when generating a chart (see https://developer.inmydata.com/a/solutions/articles/36000577995?portalId=36000061664).
+            api_key (Optional[str]): 
+                The API key for authenticating with the inmydata platform. If None, it will attempt to read from the environment variable 'INMYDATA_API_KEY'.
+            logging_level (int): 
+                The logging level for the logger, default is logging.INFO.
+            log_file (Optional[str]): 
+                The file to log messages to, if None, logs will be printed to the console.
         """
         self.server = server
         self.tenant = tenant
@@ -296,11 +314,14 @@ class StructuredDataDriver:
 
         self.logger.propagate = False  # Prevent propagation to the root logger
         
-        try:
-           self.api_key = os.environ['INMYDATA_API_KEY']
-        except KeyError:
-           self.api_key = ""
-           self.logger.warning("Environment variable INMYDATA_API_KEY not set. API requests to the inmydata platform will fail.")
+        if api_key:
+            self.api_key = api_key
+        else:
+            try:
+               self.api_key = os.environ['INMYDATA_API_KEY']
+            except KeyError:
+               self.api_key = ""
+               self.logger.warning("Environment variable INMYDATA_API_KEY not set. API requests to the inmydata platform will fail.")
 
         self.logger.info("StructuredDataDriver initialized.")
 
@@ -343,6 +364,62 @@ class StructuredDataDriver:
         """
         self.session_id = session_id
         self.logger.info(f"Session ID set to {session_id}")
+
+    def get_schema(self, source: Optional[str] = None):
+        """ Retrieves the schema of the structured data available in the inmydata platform.
+
+        Returns:
+            dict: A dictionary representing the schema of the structured data.
+        """
+        try:
+            result = None
+            headers = {'Authorization': 'Bearer ' + self.api_key,
+                    'Content-Type': 'application/json'}
+            url = 'https://' + self.tenant + '.' + self.server + '/api/developer/v1/ai/getapisubjectlistinfo'
+            req_body = {"subject": None}
+            x = requests.post(url,headers=headers, json=req_body)
+            if x.status_code == 200:    
+                try:
+                    parsed = json.loads(x.text)
+                except json.JSONDecodeError as e:
+                    raise RuntimeError(f"Invalid JSON from backend: {e}") from e
+
+                payload = parsed.get("value", parsed) if isinstance(parsed, dict) else parsed
+
+                # Ensure structure we expect
+                subjects: List[Dict[str, Any]] = []
+                if isinstance(payload, dict) and isinstance(payload.get("subjects"), list):
+                    subjects = payload["subjects"]
+                elif isinstance(payload, list):
+                    # Some backends might directly return a list of subjects
+                    subjects = payload
+                else:
+                    # Be generous but explicit
+                    subjects = []
+
+                # Enrich with counts
+                for subj in subjects:
+                    if not isinstance(subj, dict):
+                        continue
+                    fact_field_types = subj.get("factFieldTypes") or {}
+                    metric_field_types = subj.get("metricFieldTypes") or {}
+                    subj["numDimensions"] = len(fact_field_types) if isinstance(fact_field_types, dict) else 0
+                    subj["numMetrics"] = len(metric_field_types) if isinstance(metric_field_types, dict) else 0
+
+                result = {
+                    "schemaVersion": 1,
+                    "generatedAt": datetime.now().isoformat(timespec="seconds") + "Z",
+                    "source": source,
+                    "subjectsCount": len(subjects),
+                    "subjects": subjects,
+                }
+
+                # Compact JSON, stable ordering for easier diffs
+                return json.dumps(result, ensure_ascii=False, separators=(",", ":"), sort_keys=False)
+
+        except Exception as e:
+            # Mirror your C# error string style
+            return f"Error retrieving schema: {e}"
 
     def get_data(self, subject: str, fields: list[str], filters: list[AIDataFilter],TopNUsed: Optional[dict['str', 'TopNOption']] = None) -> pd.DataFrame | None:
             """ Retrieves data from the inmydata platform based on the specified subject, fields, and filters.

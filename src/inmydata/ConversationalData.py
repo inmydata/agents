@@ -105,6 +105,8 @@ class ConversationalDataDriver:
         The user for whom the driver is initialized, if None, no user is set. Useful to identify the user when generating a chart (see https://developer.inmydata.com/a/solutions/articles/36000577995?portalId=36000061664).
     session_id : Optional[str]      
         The session ID for the driver, if None, no session ID is set. Useful to identify the session when generating a chart (see https://developer.inmydata.com/a/solutions/articles/36000577995?portalId=36000061664).
+    api_key (Optional[str]): 
+        The API key for authenticating with the inmydata platform. If None, it will attempt to read from the environment variable 'INMYDATA_API_KEY'.    
     logging_level : Optional[int]
         The logging level for the logger, default is logging.INFO.
     log_file : Optional[str]
@@ -146,17 +148,25 @@ class ConversationalDataDriver:
         def toJSON(self):
           return json.dumps(self, default=lambda o: o.__dict__, sort_keys=True, indent=4)
 
-    def __init__(self, tenant: str, server:str ="inmydata.com", user: Optional[str] = None, session_id: Optional[str] = None,  logging_level: Optional[int] = logging.INFO, log_file: Optional[str] = None):
+    def __init__(self, tenant: str, server:str ="inmydata.com", user: Optional[str] = None, session_id: Optional[str] = None,  api_key: Optional[str] = None, logging_level: Optional[int] = logging.INFO, log_file: Optional[str] = None):
         """
         Initializes the ConversationalDataDriver with the specified tenant, server, logging level, and optional log file.
         
         Args:
-            tenant (str): The tenant identifier for the inmydata platform.
-            server (str): The server address for the inmydata platform, default is "inmydata.com".  
-            user (Optional[str]): The user for whom the driver is initialized, if None, no user is set. Useful to identify the user when generating a chart.
-            session_id (Optional[str]): The session ID for the driver, if None, no session ID is set. Useful to identify the session when generating a chart.
-            logging_level (int): The logging level for the logger, default is logging.INFO.
-            log_file (Optional[str]): The file to log messages to, if None, logs to console.
+            tenant : str
+                The tenant identifier for the inmydata platform.
+            server : str
+                The server address for the inmydata platform, default is "inmydata.com".
+            user : Optional[str]
+                The user for whom the driver is initialized, if None, no user is set. Useful to identify the user when generating a chart (see https://developer.inmydata.com/a/solutions/articles/36000577995?portalId=36000061664).
+            session_id : Optional[str]      
+                The session ID for the driver, if None, no session ID is set. Useful to identify the session when generating a chart (see https://developer.inmydata.com/a/solutions/articles/36000577995?portalId=36000061664).
+            api_key (Optional[str]): 
+                The API key for authenticating with the inmydata platform. If None, it will attempt to read from the environment variable 'INMYDATA_API_KEY'.    
+            logging_level : Optional[int]
+                The logging level for the logger, default is logging.INFO.
+            log_file : Optional[str]
+                The file to log messages to, if None, logs to console.
         """
         self._callbacks = {} 
         self.server = server
@@ -184,11 +194,14 @@ class ConversationalDataDriver:
 
         self.logger.propagate = False  # Prevent propagation to the root logger
 
-        try:
-           self.api_key = os.environ['INMYDATA_API_KEY']
-        except KeyError:
-           self.api_key = ""
-           self.logger.warning("Environment variable INMYDATA_API_KEY not set. API requests to the inmydata platform will fail.")
+        if api_key:
+            self.api_key = api_key
+        else:
+            try:
+               self.api_key = os.environ['INMYDATA_API_KEY']
+            except KeyError:
+               self.api_key = ""
+               self.logger.warning("Environment variable INMYDATA_API_KEY not set. API requests to the inmydata platform will fail.")
 
         self.hub_connection = HubConnectionBuilder()\
             .with_url("https://" + tenant + "." + server + "/datahub",
