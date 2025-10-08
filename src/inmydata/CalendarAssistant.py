@@ -288,7 +288,7 @@ class CalendarAssistant:
         if input_json_string is None:
             raise ValueError("input_json_string is None and cannot be loaded as JSON")
         myobj = json.loads(input_json_string)
-        headers = {'Authorization': 'Bearer ' + self.__get_auth_token(),
+        headers = {'Authorization': 'Bearer ' + self.api_key,
                 'Content-Type': 'application/json'}
         url = 'https://' + self.tenant + '.' + self.server + '/api/developer/v1/ai/getcalendarperiodrange'
         x = requests.post(url, json=myobj,headers=headers)
@@ -302,9 +302,6 @@ class CalendarAssistant:
                     datetime.fromisoformat(rangedict["endDate"]).date()
                 )
         return result
-
-    def __get_auth_token(self):        
-        return os.environ['INMYDATA_API_KEY'] 
     
     def __get_calendar_details(self,input_date:date):
         result = None
@@ -313,7 +310,7 @@ class CalendarAssistant:
         if input_json_string is None:
             raise ValueError("input_json_string is None and cannot be loaded as JSON")
         myobj = json.loads(input_json_string)
-        headers = {'Authorization': 'Bearer ' + self.__get_auth_token(),
+        headers = {'Authorization': 'Bearer ' + self.api_key,
                 'Content-Type': 'application/json'}
         url = 'https://' + self.tenant + '.' + self.server + '/api/developer/v1/ai/getcalendardetails'
         x = requests.post(url, json=myobj,headers=headers)
