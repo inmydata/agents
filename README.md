@@ -59,7 +59,43 @@ driver.user = "demo" # Events to display charts will be available to the user sp
 driver.session_id = "test-session" # Session ID passed in the event to display charts. Can optionally be used to only show charts for the current session
 
 # -- Get a json document that details the available schema
-print(driver.get_schema("Readme Documentation"))
+# get_schema retrieves metadata about available subjects (datasets), including:
+# - Field names and types (dimensions and metrics)
+# - AI descriptions for fields
+# - Number of available dimensions and metrics per subject
+# The optional 'source' parameter helps track where schema requests originate from
+schema = driver.get_schema("Readme Documentation")
+print(schema)
+
+# Example output:
+# {
+#   "schemaVersion": 1,
+#   "generatedAt": "2025-11-18T11:24:16Z",
+#   "source": "Readme Documentation",
+#   "subjectsCount": 1,
+#   "subjects": [
+#     {
+#       "name": "Inmystore Sales",
+#       "aiDescription": "This subject (dataset) contains transactional data for a retail organisation...",
+#       "factFieldTypes": {
+#         "Customer": {"name": "Customer", "type": "System.String", "aiDescription": null},
+#         "Date": {"name": "Date", "type": "System.DateTime", "aiDescription": null},
+#         "Financial Year": {"name": "Financial Year", "type": "System.Int32", 
+#                           "aiDescription": "This dimension contains a Year value..."}
+#         # ... more dimension fields
+#       },
+#       "metricFieldTypes": {
+#         "Cost of Sale": {"name": "Cost of Sale", "type": "System.Decimal", 
+#                         "dimensionsUsed": null, "aiDescription": ""},
+#         "Sales Value": {"name": "Sales Value", "type": "System.Decimal", 
+#                        "dimensionsUsed": null, "aiDescription": ""}
+#         # ... more metric fields
+#       },
+#       "numDimensions": 26,
+#       "numMetrics": 14
+#     }
+#   ]
+# }
 
 # -- Use get_data_simple when your filter is simple (only equality filters, no bracketing, no ORs, etc.)
 
