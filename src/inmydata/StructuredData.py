@@ -209,24 +209,30 @@ class StructuredDataDriver:
             The session ID for the driver, if None, no session ID is set. Useful to identify the session when generating a chart (see https://developer.inmydata.com/a/solutions/articles/36000577995?portalId=36000061664).
         api_key (Optional[str]): 
                 The API key for authenticating with the inmydata platform. If None, it will attempt to read from the environment variable 'INMYDATA_API_KEY'.
+        type (Optional[str]): 
+                The type of the data source to use. When blank this will indicate the inmydata platform. If None, it will attempt to read from the environment variable 'INMYDATA_TYPE'.
         logging_level (Optional[int]): 
             The logging level for the logger, default is logging.INFO.
         log_file (Optional[str]): 
             The file to log messages to, if None, logs will be printed to the console.
     """
     class _AIDataAPIRequest:
-        def __init__(self, Subject: str, Fields: list[str], Filters: list['AIDataFilter'], TopNUsed: dict['str', 'TopNOption']):
+        def __init__(self, Subject: str, Fields: list[str], Filters: list['AIDataFilter'], TopNUsed: dict['str', 'TopNOption'], SummaryRequest: bool, System: str):
             self.Subject = Subject
             self.Fields = Fields
             self.Filters = Filters  # List of AIDataFilterUsed
             self.TopNUsed = TopNUsed
+            self.SummaryRequest = SummaryRequest
+            self.System = System
         def to_dict(self):
             return {
                 "Subject": self.Subject,
                 "Fields": self.Fields,
                 "Filters": [f.to_dict() for f in self.Filters],
-                "TopNUsed": {k: v.to_dict() for k, v in self.TopNUsed.items()} 
-            }
+                "TopNUsed": {k: v.to_dict() for k, v in self.TopNUsed.items()},
+                "SummaryRequest": self.SummaryRequest,
+                "System": self.System
+            } 
 
     class _AIDataAPIResponse:
         def __init__(self,noRows,fileSize,csvDataString,columnNamesandTypes):      
@@ -269,7 +275,7 @@ class StructuredDataDriver:
         def toJSON(self):
           return json.dumps(self, default=lambda o: o.__dict__, sort_keys=True, indent=4)
 
-    def __init__(self, tenant: str, server:str ="inmydata.com", user: Optional[str] = None, session_id: Optional[str] = None,  api_key: Optional[str] = None, logging_level: Optional[int] = logging.INFO, log_file: Optional[str] = None ):
+    def __init__(self, tenant: str, server:str ="inmydata.com", user: Optional[str] = None, session_id: Optional[str] = None,  api_key: Optional[str] = None, type: Optional[str] = None , logging_level: Optional[int] = logging.INFO, log_file: Optional[str] = None):
         """
         Initializes the StructuredDataDriver with the specified tenant, server, logging level, and log file.
         
@@ -284,6 +290,8 @@ class StructuredDataDriver:
                 The session ID for the driver, if None, no session ID is set. Useful to identify the session when generating a chart (see https://developer.inmydata.com/a/solutions/articles/36000577995?portalId=36000061664).
             api_key (Optional[str]): 
                 The API key for authenticating with the inmydata platform. If None, it will attempt to read from the environment variable 'INMYDATA_API_KEY'.
+            type (str): 
+                The type of data source the MCP should use. This will be "" by default which will be inmydata data platform. The alternative is OpenEdge. If None, it will attempt to read from the environment variable 'INMYDATA_TYPE'.               
             logging_level (int): 
                 The logging level for the logger, default is logging.INFO.
             log_file (Optional[str]): 
@@ -293,6 +301,7 @@ class StructuredDataDriver:
         self.tenant = tenant
         self.user = user
         self.session_id = session_id
+        self.type = type
 
         # Create a logger specific to this class/instance
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}.{tenant}")
@@ -365,6 +374,24 @@ class StructuredDataDriver:
         self.session_id = session_id
         self.logger.info(f"Session ID set to {session_id}")
 
+    def get_type(self):
+        """ 
+        Returns the type of data source for the driver.
+        
+        Returns:
+            Optional[str]: The type of data source for the driver, or blank/empty.
+        """
+        return self.type
+    def set_type(self, type: str):
+        """ 
+        Sets the type of data source for the driver.
+        
+        Args:
+            type (str): The type of data source to set for the driver.
+        """
+        self.type = type
+        self.logger.info(f"Type set to {type}")
+
     def get_schema(self, source: Optional[str] = None):
         """ Retrieves the schema of the structured data available in the inmydata platform.
 
@@ -376,7 +403,7 @@ class StructuredDataDriver:
             headers = {'Authorization': 'Bearer ' + self.api_key,
                     'Content-Type': 'application/json'}
             url = 'https://' + self.tenant + '.' + self.server + '/api/developer/v1/ai/getapisubjectlistinfo'
-            req_body = {"subject": None}
+            req_body = {"subject": None, "type": self.type}
             x = requests.post(url,headers=headers, json=req_body)
             if x.status_code == 200:    
                 try:
@@ -403,6 +430,7 @@ class StructuredDataDriver:
                         continue
                     fact_field_types = subj.get("factFieldTypes") or {}
                     metric_field_types = subj.get("metricFieldTypes") or {}
+                    system = subj.get("system") or ""
                     subj["numDimensions"] = len(fact_field_types) if isinstance(fact_field_types, dict) else 0
                     subj["numMetrics"] = len(metric_field_types) if isinstance(metric_field_types, dict) else 0
 
@@ -421,13 +449,15 @@ class StructuredDataDriver:
             # Mirror your C# error string style
             return f"Error retrieving schema: {e}"
 
-    def get_data(self, subject: str, fields: list[str], filters: list[AIDataFilter],TopNUsed: Optional[dict['str', 'TopNOption']] = None) -> pd.DataFrame | None:
+    def get_data(self, subject: str, fields: list[str], filters: list[AIDataFilter],SummaryRequest: bool,System: str, TopNUsed: Optional[dict['str', 'TopNOption']] = None) -> pd.DataFrame | None:
             """ Retrieves data from the inmydata platform based on the specified subject, fields, and filters.
 
             Args:
                 subject (str): The subject to query data from.
                 fields (list[str]): The list of fields to retrieve.
                 filters (list[AIDataFilter]): The list of filters to apply to the query.
+                SummaryRequest (bool): A flag to indicate if the data request should use a summary query which will summarize the data based on the fields specified. This is useful when datasets are large and is the default. If SummaryRequest is set to false then it allows data to be read without being summarized.
+                System (str): The system to use. This will come from the System property of the subject selected.
                 TopNUsed (Optional[dict['str', 'TopNOption']]): Optional dictionary of Top N filters to apply to the query. Defaults to None. They key of the dictionary is the name of the column the top N filter will be applied to.
             Returns:
                 pd.DataFrame: A pandas DataFrame containing the retrieved data.
@@ -435,7 +465,7 @@ class StructuredDataDriver:
             result = None
             if TopNUsed is None:
                 TopNUsed = {}
-            aidatareq = self._AIDataAPIRequest(subject,fields,filters,TopNUsed)
+            aidatareq = self._AIDataAPIRequest(subject,fields,filters,TopNUsed,SummaryRequest,System)
             input_json_string  = jsonpickle.encode(aidatareq.to_dict(), unpicklable=False)
             self.logger.info("Executing " + str(input_json_string))
             if input_json_string is None:
@@ -470,6 +500,8 @@ class StructuredDataDriver:
             subject:str,
             fields:list[str],
             simplefilters:list[AIDataSimpleFilter], 
+            SummaryRequest: bool,
+            System: str,            
             caseSensitive: Optional[bool] = True, 
             TopNUsed: Optional[dict['str', 'TopNOption']] = None) -> pd.DataFrame | None:
             """ 
@@ -479,6 +511,8 @@ class StructuredDataDriver:
                 subject (str): The subject to query data from.
                 fields (list[str]): The list of fields to retrieve.
                 simplefilters (list[AIDataSimpleFilter]): The list of simple filters to apply to the query.
+                SummaryRequest (bool): A flag to indicate if the data request should use a summary query which will summarize the data based on the fields specified. This is useful when datasets are large and is the default. If SummaryRequest is set to false then it allows data to be read without being summarized.
+                System (str): The system to use. This will come from the System property of the subject selected.                
                 caseSensitive (Optional[bool]): Whether the filter should be case sensitive. Defaults to True.
                 TopNUsed (Optional[dict['str', 'TopNOption']]): Optional dictionary of Top N filters to apply to the query. Defaults to None. They key of the dictionary is the name of the column the top N filter will be applied to.
             
@@ -491,7 +525,7 @@ class StructuredDataDriver:
             for simpleFilter in simplefilters:           
               filter = AIDataFilter(Field=simpleFilter.Field,ConditionOperator=ConditionOperator.Equals,LogicalOperator=LogicalOperator.And,Value=simpleFilter.Value,StartGroup=0,EndGroup=0, CaseInsensitive=case_insensitive)
               filters.append(filter)
-            return self.get_data(subject,fields,filters,TopNUsed)
+            return self.get_data(subject,fields,filters,TopNUsed,SummaryRequest,System)
     
     def get_chart(
             self,
