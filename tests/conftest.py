@@ -20,11 +20,16 @@ SCHEMA_URL = f"{BASE_URL}/getapisubjectlistinfo"
 CALENDAR_RANGE_URL = f"{BASE_URL}/getcalendarperiodrange"
 CALENDAR_DETAILS_URL = f"{BASE_URL}/getcalendardetails"
 
+# The platform sends Dictionary<string, string>, field name to .NET type name, keyed on
+# the fields the caller requested and in request order. "System.Date" is the platform's
+# own date-only marker rather than a CLR type name, and reaches the client verbatim.
 COLUMN_TYPES = {
     "Customer": "System.String",
     "Sales Value": "System.Decimal",
     "Financial Year": "System.Int32",
     "Date": "System.DateTime",
+    "Delivery Date": "System.Date",
+    "Order Count": "System.Int64",
     "Is Active": "System.Boolean",
 }
 

@@ -54,6 +54,11 @@ All of them subclass `InmydataAPIError` and carry a `status_code`. `InmydataResp
 subclasses `ValueError`, so existing `except ValueError` handlers around a malformed response
 keep working.
 
+Two statuses are worth knowing by sight. A **403** on a data request usually means the subject is
+not flagged API-enabled in tenant administration, rather than anything wrong with your token. A
+**400** from `get_data` is most often the platform refusing a result set over 50MB; its message
+says so, and the fix is to add filters or request fewer fields.
+
 ```python
 from inmydata import InmydataAccessDeniedError, InmydataAuthenticationError
 

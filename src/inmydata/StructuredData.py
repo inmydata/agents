@@ -16,28 +16,39 @@ from ._http import DEFAULT_TIMEOUT
 from .exceptions import InmydataResponseError, raise_for_status
 
 _PANDAS_DTYPES = {
+    # The platform sends .NET type names, from Type.ToString() on the field's CLR type.
+    "System.Int16": "int64",
     "System.Int32": "int64",
     "System.Int64": "int64",
-    "System.Int16": "int64",
     "System.Decimal": "float64",
     "System.Double": "float64",
     "System.Single": "float64",
     "System.DateTime": "datetime64[ns]",
+    # "System.Date" is not a CLR type. It is the platform's own marker for a date-only
+    # source field, and reaches the response verbatim, so it has to be mapped here too.
+    "System.Date": "datetime64[ns]",
     "System.Boolean": "bool",
+    "System.String": "object",
 }
 
 
 def _empty_frame(columnNamesandTypes) -> pd.DataFrame:
     """Builds the empty DataFrame returned when a query matches no rows.
 
-    The columns and their order come from the response's columnNamesandTypes, and
-    the dtypes from the declared platform types, so that a zero-row result behaves
-    the same as a one-row result under .sum(), a numeric comparison or a .dtypes
-    check. Anything unrecognised falls back to object.
+    The columns and their order come from the response's columnNamesandTypes, whose
+    keys are the fields the caller requested, in request order, so they match the
+    columns of a populated result. The dtypes come from the declared platform types,
+    so that a zero-row result behaves the same as a one-row result under .sum(), a
+    numeric comparison or a .dtypes check. Anything unrecognised falls back to object,
+    which is also what the platform falls back to.
+
+    An integer column is typed int64 here, whereas a populated result containing nulls
+    in that column would read back as float64. That divergence is inherent to
+    read_csv and is not worth a nullable extension dtype at this scale.
 
     Args:
-        columnNamesandTypes: The response's column map, name to declared type.
-            The type may be a bare string or a dict carrying a "type" key.
+        columnNamesandTypes: The response's column map, field name to declared type
+            name. The platform sends a JSON object of strings.
 
     Returns:
         pd.DataFrame: An empty DataFrame with the named, typed columns.
@@ -46,8 +57,6 @@ def _empty_frame(columnNamesandTypes) -> pd.DataFrame:
         return pd.DataFrame()
     frame = pd.DataFrame()
     for name, declared in columnNamesandTypes.items():
-        if isinstance(declared, dict):
-            declared = declared.get("type")
         dtype = _PANDAS_DTYPES.get(declared, "object") if isinstance(declared, str) else "object"
         frame[name] = pd.Series([], dtype=dtype)
     return frame

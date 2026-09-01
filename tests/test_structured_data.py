@@ -79,10 +79,27 @@ def test_zero_rows_frame_carries_the_declared_dtypes(driver):
         "Sales Value": "float64",
         "Financial Year": "int64",
         "Date": "datetime64[ns]",
+        # System.Date is the platform's date-only marker, not a CLR type name.
+        "Delivery Date": "datetime64[ns]",
+        "Order Count": "int64",
         "Is Active": "bool",
     }
     # The point of the dtypes: numeric aggregation works on the empty frame.
     assert frame["Sales Value"].sum() == 0
+
+
+@responses.activate
+def test_zero_rows_frame_preserves_the_requested_column_order(driver):
+    """The platform keys columnNamesandTypes on the requested fields, in request order."""
+    columns = {"Region": "System.String", "Sales Value": "System.Decimal", "Year": "System.Int32"}
+    responses.add(
+        responses.POST,
+        DATA_URL,
+        body=data_response(None, no_rows=0, columns=columns),
+        status=200,
+    )
+    frame = driver.get_data("Sales", ["Region", "Sales Value", "Year"], _filters())
+    assert list(frame.columns) == ["Region", "Sales Value", "Year"]
 
 
 @responses.activate
