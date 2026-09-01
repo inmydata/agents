@@ -11,6 +11,9 @@ wheels/
 
 # distribution files
 /dist
-# test virtualenv
-.venv-test/
+# virtualenvs
 .venv/
+.venv*/
+
+# pytest
+.pytest_cache/

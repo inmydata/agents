@@ -28,6 +28,8 @@ Install the inmydata agent SDK with pip
 
 See [https://developer.inmydata.com](https://developer.inmydata.com) for quickstarts, documentation, and examples.
 
+Maintainers: see [RELEASING.md](RELEASING.md) for how a version reaches PyPI.
+
 
 ## Release notes
 
