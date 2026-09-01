@@ -68,16 +68,37 @@ committing to a tag.
 Only needed if the workflow is unavailable, or for a release predating it. PyPI does not allow a
 version to be replaced once uploaded, so get the version right first.
 
+Build from a checkout of the tag, not from a feature branch, so that what you upload is what the
+tag says. Do the whole thing in a virtualenv: `build` and `twine` are release tooling and do not
+belong in a system-wide Python, and on Windows `py` often resolves to an install under
+`C:\Program Files` where they are unwelcome.
+
 ```bash
-py -m pip install --upgrade build twine
-py -m build                   # writes dist/*.tar.gz and dist/*.whl
-py -m twine check --strict dist/*
-py -m twine upload dist/*     # username __token__, password is a PyPI API token
+git checkout main && git pull          # or: git checkout v0.0.20
+rm -rf dist                            # stale artefacts would be re-uploaded and fail
+py -m venv .venv                       # .venv is gitignored
+.venv/Scripts/python -m pip install --upgrade build twine   # Linux/macOS: .venv/bin/python
+.venv/Scripts/python -m build          # writes dist/*.tar.gz and dist/*.whl
+.venv/Scripts/python -m twine check --strict dist/*
+.venv/Scripts/python -m twine upload dist/*
 ```
 
-Clear out `dist/` first if it holds artefacts from an earlier version, or `twine upload dist/*`
-will try to re-upload them and fail. `dist/` is gitignored; do not commit build artefacts, which
-is what happened up to 0.0.18 and was stopped deliberately.
+`twine upload` prompts for credentials: the username is the literal `__token__` and the password
+is a PyPI API token, `pypi-` prefix included. Generate one at
+<https://pypi.org/manage/account/token/>, scoped to this project. Tokens are shown once, so if
+you cannot find an old one, issue a new token and revoke the old.
+
+Before uploading it is worth confirming the artefact itself, since this is the last point at
+which a mistake is cheap:
+
+```bash
+py -m venv /tmp/smoke
+/tmp/smoke/Scripts/python -m pip install --no-cache-dir dist/inmydata-0.0.20-py3-none-any.whl
+/tmp/smoke/Scripts/python -c "import inmydata; from importlib.metadata import version; print(version('inmydata'))"
+```
+
+`dist/` is gitignored; do not commit build artefacts. That is what happened up to 0.0.18 and was
+stopped deliberately in `beb4029`.
 
 ## Version history and tags
 
@@ -86,5 +107,8 @@ at the time; `0.0.12`, `0.0.13`, `0.0.14`, `0.0.16` and `0.0.18` all appear as v
 `pyproject.toml` history with no tag. `v0.0.18` and `v0.0.19` were added retrospectively,
 `v0.0.18` pointing at `d8b424b`, the commit that both set the version and carried the built
 artefacts. The earlier gaps have been left alone.
+
+`v0.0.19` was tagged before this workflow existed, so nothing fired for it and it goes out via
+the manual route above. The workflow applies from the next release onward.
 
 Every future release should have a tag, because the tag is what triggers publishing.
