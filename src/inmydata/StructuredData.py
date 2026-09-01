@@ -9,8 +9,57 @@ import gzip
 from enum import Enum
 import logging
 from typing import Optional
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple, Union
 from datetime import datetime
+
+from ._http import DEFAULT_TIMEOUT
+from .exceptions import InmydataResponseError, raise_for_status
+
+_PANDAS_DTYPES = {
+    # The platform sends .NET type names, from Type.ToString() on the field's CLR type.
+    "System.Int16": "int64",
+    "System.Int32": "int64",
+    "System.Int64": "int64",
+    "System.Decimal": "float64",
+    "System.Double": "float64",
+    "System.Single": "float64",
+    "System.DateTime": "datetime64[ns]",
+    # "System.Date" is not a CLR type. It is the platform's own marker for a date-only
+    # source field, and reaches the response verbatim, so it has to be mapped here too.
+    "System.Date": "datetime64[ns]",
+    "System.Boolean": "bool",
+    "System.String": "object",
+}
+
+
+def _empty_frame(columnNamesandTypes) -> pd.DataFrame:
+    """Builds the empty DataFrame returned when a query matches no rows.
+
+    The columns and their order come from the response's columnNamesandTypes, whose
+    keys are the fields the caller requested, in request order, so they match the
+    columns of a populated result. The dtypes come from the declared platform types,
+    so that a zero-row result behaves the same as a one-row result under .sum(), a
+    numeric comparison or a .dtypes check. Anything unrecognised falls back to object,
+    which is also what the platform falls back to.
+
+    An integer column is typed int64 here, whereas a populated result containing nulls
+    in that column would read back as float64. That divergence is inherent to
+    read_csv and is not worth a nullable extension dtype at this scale.
+
+    Args:
+        columnNamesandTypes: The response's column map, field name to declared type
+            name. The platform sends a JSON object of strings.
+
+    Returns:
+        pd.DataFrame: An empty DataFrame with the named, typed columns.
+    """
+    if not isinstance(columnNamesandTypes, dict):
+        return pd.DataFrame()
+    frame = pd.DataFrame()
+    for name, declared in columnNamesandTypes.items():
+        dtype = _PANDAS_DTYPES.get(declared, "object") if isinstance(declared, str) else "object"
+        frame[name] = pd.Series([], dtype=dtype)
+    return frame
 
 class ConditionOperator(Enum):
    """
@@ -269,10 +318,10 @@ class StructuredDataDriver:
         def toJSON(self):
           return json.dumps(self, default=lambda o: o.__dict__, sort_keys=True, indent=4)
 
-    def __init__(self, tenant: str, server:str ="inmydata.com", user: Optional[str] = None, session_id: Optional[str] = None,  api_key: Optional[str] = None, logging_level: Optional[int] = logging.INFO, log_file: Optional[str] = None ):
+    def __init__(self, tenant: str, server:str ="inmydata.com", user: Optional[str] = None, session_id: Optional[str] = None,  api_key: Optional[str] = None, logging_level: Optional[int] = logging.INFO, log_file: Optional[str] = None, timeout: Optional[Union[float, Tuple[float, float]]] = None ):
         """
         Initializes the StructuredDataDriver with the specified tenant, server, logging level, and log file.
-        
+
         Args:
             tenant (str): 
                 The tenant identifier for the inmydata platform.      
@@ -286,13 +335,17 @@ class StructuredDataDriver:
                 The API key for authenticating with the inmydata platform. If None, it will attempt to read from the environment variable 'INMYDATA_API_KEY'.
             logging_level (int): 
                 The logging level for the logger, default is logging.INFO.
-            log_file (Optional[str]): 
+            log_file (Optional[str]):
                 The file to log messages to, if None, logs will be printed to the console.
+            timeout (Optional[Union[float, Tuple[float, float]]]):
+                The timeout passed to every request, either a single number of seconds or a
+                (connect, read) pair. If None, DEFAULT_TIMEOUT is used.
         """
         self.server = server
         self.tenant = tenant
         self.user = user
         self.session_id = session_id
+        self.timeout = DEFAULT_TIMEOUT if timeout is None else timeout
 
         # Create a logger specific to this class/instance
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}.{tenant}")
@@ -365,63 +418,67 @@ class StructuredDataDriver:
         self.session_id = session_id
         self.logger.info(f"Session ID set to {session_id}")
 
-    def get_schema(self, source: Optional[str] = None):
+    def get_schema(self, source: Optional[str] = None) -> str:
         """ Retrieves the schema of the structured data available in the inmydata platform.
 
+        Args:
+            source (Optional[str]): A label recorded in the returned document, used to track
+                where the schema request originated from.
+
         Returns:
-            dict: A dictionary representing the schema of the structured data.
+            str: A JSON document describing the schema of the structured data.
+
+        Raises:
+            InmydataAPIError: Or a subclass, if the platform returns a non-success status.
+            InmydataResponseError: If the platform returns success but the body cannot be
+                parsed as JSON.
         """
+        headers = {'Authorization': 'Bearer ' + self.api_key,
+                'Content-Type': 'application/json'}
+        url = 'https://' + self.tenant + '.' + self.server + '/api/developer/v1/ai/getapisubjectlistinfo'
+        req_body = {"subject": None}
+        x = requests.post(url,headers=headers, json=req_body, timeout=self.timeout)
+        raise_for_status(x.status_code, x.text, url)
+
         try:
-            result = None
-            headers = {'Authorization': 'Bearer ' + self.api_key,
-                    'Content-Type': 'application/json'}
-            url = 'https://' + self.tenant + '.' + self.server + '/api/developer/v1/ai/getapisubjectlistinfo'
-            req_body = {"subject": None}
-            x = requests.post(url,headers=headers, json=req_body)
-            if x.status_code == 200:    
-                try:
-                    parsed = json.loads(x.text)
-                except json.JSONDecodeError as e:
-                    raise RuntimeError(f"Invalid JSON from backend: {e}") from e
+            parsed = json.loads(x.text)
+        except json.JSONDecodeError as e:
+            raise InmydataResponseError(f"Invalid JSON from {url}: {e}") from e
 
-                payload = parsed.get("value", parsed) if isinstance(parsed, dict) else parsed
+        payload = parsed.get("value", parsed) if isinstance(parsed, dict) else parsed
 
-                # Ensure structure we expect
-                subjects: List[Dict[str, Any]] = []
-                if isinstance(payload, dict) and isinstance(payload.get("subjects"), list):
-                    subjects = payload["subjects"]
-                elif isinstance(payload, list):
-                    # Some backends might directly return a list of subjects
-                    subjects = payload
-                else:
-                    # Be generous but explicit
-                    subjects = []
+        # Ensure structure we expect
+        subjects: List[Dict[str, Any]] = []
+        if isinstance(payload, dict) and isinstance(payload.get("subjects"), list):
+            subjects = payload["subjects"]
+        elif isinstance(payload, list):
+            # Some backends might directly return a list of subjects
+            subjects = payload
+        else:
+            # Be generous but explicit
+            subjects = []
 
-                # Enrich with counts
-                for subj in subjects:
-                    if not isinstance(subj, dict):
-                        continue
-                    fact_field_types = subj.get("factFieldTypes") or {}
-                    metric_field_types = subj.get("metricFieldTypes") or {}
-                    subj["numDimensions"] = len(fact_field_types) if isinstance(fact_field_types, dict) else 0
-                    subj["numMetrics"] = len(metric_field_types) if isinstance(metric_field_types, dict) else 0
+        # Enrich with counts
+        for subj in subjects:
+            if not isinstance(subj, dict):
+                continue
+            fact_field_types = subj.get("factFieldTypes") or {}
+            metric_field_types = subj.get("metricFieldTypes") or {}
+            subj["numDimensions"] = len(fact_field_types) if isinstance(fact_field_types, dict) else 0
+            subj["numMetrics"] = len(metric_field_types) if isinstance(metric_field_types, dict) else 0
 
-                result = {
-                    "schemaVersion": 1,
-                    "generatedAt": datetime.now().isoformat(timespec="seconds") + "Z",
-                    "source": source,
-                    "subjectsCount": len(subjects),
-                    "subjects": subjects,
-                }
+        result = {
+            "schemaVersion": 1,
+            "generatedAt": datetime.now().isoformat(timespec="seconds") + "Z",
+            "source": source,
+            "subjectsCount": len(subjects),
+            "subjects": subjects,
+        }
 
-                # Compact JSON, stable ordering for easier diffs
-                return json.dumps(result, ensure_ascii=False, separators=(",", ":"), sort_keys=False)
+        # Compact JSON, stable ordering for easier diffs
+        return json.dumps(result, ensure_ascii=False, separators=(",", ":"), sort_keys=False)
 
-        except Exception as e:
-            # Mirror your C# error string style
-            return f"Error retrieving schema: {e}"
-
-    def get_data(self, subject: str, fields: list[str], filters: list[AIDataFilter],TopNUsed: Optional[dict['str', 'TopNOption']] = None) -> pd.DataFrame | None:
+    def get_data(self, subject: str, fields: list[str], filters: list[AIDataFilter],TopNUsed: Optional[dict['str', 'TopNOption']] = None) -> pd.DataFrame:
             """ Retrieves data from the inmydata platform based on the specified subject, fields, and filters.
 
             Args:
@@ -430,9 +487,18 @@ class StructuredDataDriver:
                 filters (list[AIDataFilter]): The list of filters to apply to the query.
                 TopNUsed (Optional[dict['str', 'TopNOption']]): Optional dictionary of Top N filters to apply to the query. Defaults to None. They key of the dictionary is the name of the column the top N filter will be applied to.
             Returns:
-                pd.DataFrame: A pandas DataFrame containing the retrieved data.
+                pd.DataFrame: A pandas DataFrame containing the retrieved data. If the query
+                    matched no rows this is an empty DataFrame with the queried columns and
+                    their types, never None, so that an empty result cannot be mistaken for a
+                    failure.
+
+            Raises:
+                InmydataAPIError: Or a subclass, if the platform returns a non-success status.
+                    A 401 raises InmydataAuthenticationError, a 403
+                    InmydataAccessDeniedError, a 5xx InmydataServerError.
+                InmydataResponseError: If the platform returns success but the body cannot be
+                    interpreted.
             """
-            result = None
             if TopNUsed is None:
                 TopNUsed = {}
             aidatareq = self._AIDataAPIRequest(subject,fields,filters,TopNUsed)
@@ -444,52 +510,59 @@ class StructuredDataDriver:
             headers = {'Authorization': 'Bearer ' + self.api_key,
                     'Content-Type': 'application/json'}
             url = 'https://' + self.tenant + '.' + self.server + '/api/developer/v1/ai/data'
-            x = requests.post(url, json=myobj,headers=headers)
-            if x.status_code == 200:    
+            x = requests.post(url, json=myobj,headers=headers, timeout=self.timeout)
+            raise_for_status(x.status_code, x.text, url)
+            try:
                 decoded_response = jsonpickle.decode(x.text)
-                if isinstance(decoded_response, dict):
-                    value = decoded_response.get("value")
-                else:
-                    raise ValueError("Decoded response is not a dictionary. Actual type: {}".format(type(decoded_response)))
-                if value is None:
-                    raise ValueError("Response does not contain 'value' or it is None")
-                value_json = jsonpickle.encode(value)
-                if value_json is None:
-                    raise ValueError("value_json is None and cannot be loaded as JSON")
+            except Exception as e:
+                raise InmydataResponseError(f"Could not decode the response from {url}: {e}") from e
+            if not isinstance(decoded_response, dict):
+                raise InmydataResponseError("Decoded response is not a dictionary. Actual type: {}".format(type(decoded_response)))
+            value = decoded_response.get("value")
+            if value is None:
+                raise InmydataResponseError("Response does not contain 'value' or it is None")
+            value_json = jsonpickle.encode(value)
+            if value_json is None:
+                raise InmydataResponseError("value_json is None and cannot be loaded as JSON")
+            try:
                 aidataresp = self._AIDataAPIResponse(**json.loads(value_json))
-                if aidataresp.noRows > 0:            
-                  buff = BytesIO(base64.standard_b64decode(aidataresp.csvDataString))
-                  with gzip.GzipFile(fileobj=buff) as gz:
-                    decompressed_data = gz.read()    
-                    data = StringIO(decompressed_data.decode('utf-8'))
-                    result = pd.read_csv(filepath_or_buffer = data)
-            return result
+            except (TypeError, ValueError) as e:
+                raise InmydataResponseError(f"Unexpected data response shape from {url}: {e}") from e
+            if aidataresp.noRows > 0:
+              buff = BytesIO(base64.standard_b64decode(aidataresp.csvDataString))
+              with gzip.GzipFile(fileobj=buff) as gz:
+                decompressed_data = gz.read()
+                data = StringIO(decompressed_data.decode('utf-8'))
+                return pd.read_csv(filepath_or_buffer = data)
+            return _empty_frame(aidataresp.columnNamesandTypes)
 
     def get_data_simple(
             self,
             subject:str,
             fields:list[str],
             simplefilters:list[AIDataSimpleFilter], 
-            caseSensitive: Optional[bool] = True, 
-            TopNUsed: Optional[dict['str', 'TopNOption']] = None) -> pd.DataFrame | None:
-            """ 
+            caseSensitive: Optional[bool] = True,
+            TopNUsed: Optional[dict['str', 'TopNOption']] = None) -> pd.DataFrame:
+            """
             Retrieves data from the inmydata platform based on the specified subject, fields, and simple filters.
-            
+
             Args:
                 subject (str): The subject to query data from.
                 fields (list[str]): The list of fields to retrieve.
                 simplefilters (list[AIDataSimpleFilter]): The list of simple filters to apply to the query.
-                caseSensitive (Optional[bool]): Whether the filter should be case sensitive. Defaults to True.
+                caseSensitive (Optional[bool]): Whether the filter should be case sensitive. Defaults to True. None is treated as the default.
                 TopNUsed (Optional[dict['str', 'TopNOption']]): Optional dictionary of Top N filters to apply to the query. Defaults to None. They key of the dictionary is the name of the column the top N filter will be applied to.
-            
+
             Returns:
-                pd.DataFrame: A pandas DataFrame containing the retrieved data.
+                pd.DataFrame: A pandas DataFrame containing the retrieved data. See get_data for
+                    the empty-result and error behaviour, which this method shares.
             """
             filters = []
-            # Ensure caseSensitive is always a bool
-            case_insensitive = bool(caseSensitive) if caseSensitive is not None else True
-            for simpleFilter in simplefilters:           
-              filter = AIDataFilter(Field=simpleFilter.Field,ConditionOperator=ConditionOperator.Equals,LogicalOperator=LogicalOperator.And,Value=simpleFilter.Value,StartGroup=0,EndGroup=0, CaseInsensitive=case_insensitive)
+            # None means the documented default, which is case sensitive. Before 0.0.19 this
+            # value was passed straight into CaseInsensitive, inverting the caller's intent.
+            case_sensitive = True if caseSensitive is None else bool(caseSensitive)
+            for simpleFilter in simplefilters:
+              filter = AIDataFilter(Field=simpleFilter.Field,ConditionOperator=ConditionOperator.Equals,LogicalOperator=LogicalOperator.And,Value=simpleFilter.Value,StartGroup=0,EndGroup=0, CaseInsensitive=not case_sensitive)
               filters.append(filter)
             return self.get_data(subject,fields,filters,TopNUsed)
     
@@ -519,8 +592,16 @@ class StructuredDataDriver:
 
         Returns:
             str: The ID of the generated visualisation.
+
+        Raises:
+            InmydataAPIError: Or a subclass, if the platform returns a non-success status.
+            InmydataResponseError: If the platform returns success but the body cannot be
+                interpreted.
         """
-        result = None
+        if TopNUsed is None:
+            # get_data has always done this; get_chart did not, so omitting the documented
+            # optional argument raised AttributeError in _AIChartAPIRequest.to_dict().
+            TopNUsed = {}
         aichartreq = self._AIChartAPIRequest(subject,rowfields,columnfields,metricfields,filters,charttype,caption,self.user,self.session_id,TopNUsed)
         input_json_string  = jsonpickle.encode(aichartreq.to_dict(), unpicklable=False)
         if input_json_string is None:
@@ -530,21 +611,26 @@ class StructuredDataDriver:
         headers = {'Authorization': 'Bearer ' + self.api_key,
                     'Content-Type': 'application/json'}
         url = 'https://' + self.tenant + '.' + self.server + '/api/developer/v1/ai/chart'
-        x = requests.post(url, json=myobj,headers=headers)
+        x = requests.post(url, json=myobj,headers=headers, timeout=self.timeout)
         self.logger.info("Response: " + str(x))
-        if x.status_code == 200:
-            self.logger.info("Getting chart response: " + str(x.text))
+        raise_for_status(x.status_code, x.text, url)
+        self.logger.info("Getting chart response: " + str(x.text))
+        try:
             decoded_response = jsonpickle.decode(x.text)
-            if isinstance(decoded_response, dict):
-                value = decoded_response.get("value")
-            else:
-                raise ValueError("Decoded response is not a dictionary. Actual type: {}".format(type(decoded_response)))
-            if value is None:
-                raise ValueError("Response does not contain 'value' or it is None")
-            value_json = jsonpickle.encode(value)
-            if value_json is None:
-                raise ValueError("value_json is None and cannot be loaded as JSON")
+        except Exception as e:
+            raise InmydataResponseError(f"Could not decode the response from {url}: {e}") from e
+        if not isinstance(decoded_response, dict):
+            raise InmydataResponseError("Decoded response is not a dictionary. Actual type: {}".format(type(decoded_response)))
+        value = decoded_response.get("value")
+        if value is None:
+            raise InmydataResponseError("Response does not contain 'value' or it is None")
+        value_json = jsonpickle.encode(value)
+        if value_json is None:
+            raise InmydataResponseError("value_json is None and cannot be loaded as JSON")
+        try:
             aichartresp = self._AIChartAPIResponse(**json.loads(value_json))
-            result = aichartresp.visualisationID
-            self.logger.info("get_chart responded with " + result)
+        except (TypeError, ValueError) as e:
+            raise InmydataResponseError(f"Unexpected chart response shape from {url}: {e}") from e
+        result = aichartresp.visualisationID
+        self.logger.info("get_chart responded with " + result)
         return result

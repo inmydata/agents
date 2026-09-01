@@ -11,3 +11,6 @@ wheels/
 
 # distribution files
 /dist
+# test virtualenv
+.venv-test/
+.venv/
