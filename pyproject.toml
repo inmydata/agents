@@ -4,13 +4,13 @@ build-backend = "hatchling.build"
 
 [project]
 name = "inmydata"
-version = "0.0.18"
+version = "0.0.19"
 authors = [
   { name = "inmydata", email = "info@inmydata.com" },
 ]
 description = "This package provides simple API access to the inmydata platform"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = "MIT"
 license-files = ["LICEN[CS]E*"]
 classifiers = [
@@ -24,6 +24,12 @@ dependencies = [
   "pandas >= 2.3.0",
   "requests >= 2.32.4",
   "signalrcore >= 0.9.5"
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest >= 8.0.0",
+  "responses >= 0.25.0"
 ]
 
 [project.urls]

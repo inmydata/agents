@@ -10,9 +10,13 @@ import requests
 import jsonpickle
 from datetime import date, datetime
 import logging
-from typing import Optional
+from typing import Optional, Tuple, Union
 from enum import Enum
-   
+
+from ._http import DEFAULT_TIMEOUT
+from .exceptions import InmydataResponseError, raise_for_status
+
+
 class FinancialPeriodDetails:
     """
     A structure class for passing financial periods.
@@ -143,7 +147,7 @@ class CalendarAssistant:
                 "CalendarName": self.CalendarName
             }
 
-    def __init__(self, tenant: str, calendar_name: str, server: str = "inmydata.com", api_key: Optional[str] = None, logging_level=logging.INFO, log_file: Optional[str] = None ):
+    def __init__(self, tenant: str, calendar_name: str, server: str = "inmydata.com", api_key: Optional[str] = None, logging_level=logging.INFO, log_file: Optional[str] = None, timeout: Optional[Union[float, Tuple[float, float]]] = None ):
         """
         Initializes the CalendarAssistant with the specified tenant, calendar name, server, logging level, and optional log file.
         
@@ -159,12 +163,16 @@ class CalendarAssistant:
                 The API key for authenticating with the inmydata platform. If None, it will attempt to read from the environment variable 'INMYDATA_API_KEY'. 
             logging_level (int): 
                 The logging level for the logger, default is logging.INFO.
-            log_file (Optional[str]): 
+            log_file (Optional[str]):
                 The file to log messages to, if None, logs to console.
+            timeout (Optional[Union[float, Tuple[float, float]]]):
+                The timeout passed to every request, either a single number of seconds or a
+                (connect, read) pair. If None, DEFAULT_TIMEOUT is used.
         """
         self.tenant = tenant
         self.calendar_name = calendar_name
         self.server = server
+        self.timeout = DEFAULT_TIMEOUT if timeout is None else timeout
 
         # Create a logger specific to this class/instance
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}.{tenant}")
@@ -280,7 +288,15 @@ class CalendarAssistant:
             periodtype (CalendarPeriodType): The type of calendar period (year, month, quarter, week).
             
         Returns:
-            CalendarPeriodDateRange | None: An object containing the start and end dates of the calendar period, or None if not found.
+            CalendarPeriodDateRange | None: An object containing the start and end dates of the
+                calendar period, or None if that year and period are not defined in this
+                calendar. Since 0.0.19 None means only that; a transport or authentication
+                failure raises instead of returning None.
+
+        Raises:
+            InmydataAPIError: Or a subclass, if the platform returns a non-success status.
+            InmydataResponseError: If the platform returns success but the body cannot be
+                interpreted.
         """
         result = None
         calreq = self._GetCalendarPeriodDateRangeRequest(periodtype,year,periodnumber,self.calendar_name)
@@ -291,8 +307,11 @@ class CalendarAssistant:
         headers = {'Authorization': 'Bearer ' + self.api_key,
                 'Content-Type': 'application/json'}
         url = 'https://' + self.tenant + '.' + self.server + '/api/developer/v1/ai/getcalendarperiodrange'
-        x = requests.post(url, json=myobj,headers=headers)
-        if x.status_code == 200 and x.text:
+        x = requests.post(url, json=myobj,headers=headers, timeout=self.timeout)
+        raise_for_status(x.status_code, x.text, url)
+        if not x.text:
+            raise InmydataResponseError(f"{url} returned success with an empty body")
+        try:
             response_json = json.loads(x.text)
             value = response_json.get("value")
             if value is not None:
@@ -301,10 +320,24 @@ class CalendarAssistant:
                     datetime.fromisoformat(rangedict["startDate"]).date(),
                     datetime.fromisoformat(rangedict["endDate"]).date()
                 )
+        except (ValueError, AttributeError, KeyError, TypeError) as e:
+            # ValueError covers both json.JSONDecodeError and an unparseable date string.
+            raise InmydataResponseError(f"Unexpected calendar period response from {url}: {e}") from e
         return result
-    
+
     def __get_calendar_details(self,input_date:date):
-        result = None
+        """
+        Retrieves the raw calendar details for a date from the inmydata platform.
+
+        Returns:
+            _GetCalendarDetailsResponse | None: The details, or None if the calendar has no
+                entry for the date.
+
+        Raises:
+            InmydataAPIError: Or a subclass, if the platform returns a non-success status.
+            InmydataResponseError: If the platform returns success but the body cannot be
+                interpreted.
+        """
         caldetreq = self._GetCalendarDetailsRequest(input_date,self.calendar_name)
         input_json_string  = jsonpickle.encode(caldetreq, unpicklable=False)
         if input_json_string is None:
@@ -313,13 +346,23 @@ class CalendarAssistant:
         headers = {'Authorization': 'Bearer ' + self.api_key,
                 'Content-Type': 'application/json'}
         url = 'https://' + self.tenant + '.' + self.server + '/api/developer/v1/ai/getcalendardetails'
-        x = requests.post(url, json=myobj,headers=headers)
-        if x.status_code == 200:     
+        x = requests.post(url, json=myobj,headers=headers, timeout=self.timeout)
+        raise_for_status(x.status_code, x.text, url)
+        try:
             response_json = json.loads(x.text)
-            datedetailsdict = response_json["value"]["dateDetails"]
+        except json.JSONDecodeError as e:
+            raise InmydataResponseError(f"Invalid JSON from {url}: {e}") from e
+        value = response_json.get("value") if isinstance(response_json, dict) else None
+        if value is None:
+            # A legitimate not-found: the calendar has no entry for this date. The callers
+            # turn this into their existing "Calendar details not found" ValueError.
+            return None
+        try:
+            datedetailsdict = value["dateDetails"]
             datedetails = self._DateDetails(datedetailsdict["year"],datedetailsdict["month"],datedetailsdict["week"],datedetailsdict["quarter"],
                                       datedetailsdict["yearseq"],datedetailsdict["monthseq"],datedetailsdict["weekseq"],datedetailsdict["quarterseq"],
                                       datedetailsdict["yearid"],datedetailsdict["monthid"],datedetailsdict["weekid"],datedetailsdict["quarterid"],
                                       datedetailsdict["date"])
-            result = self._GetCalendarDetailsResponse(datedetails)            
-        return result
+        except (KeyError, TypeError) as e:
+            raise InmydataResponseError(f"Unexpected calendar details response from {url}: {e}") from e
+        return self._GetCalendarDetailsResponse(datedetails)

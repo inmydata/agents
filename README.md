@@ -29,6 +29,69 @@ Install the inmydata agent SDK with pip
 See [https://developer.inmydata.com](https://developer.inmydata.com) for quickstarts, documentation, and examples.
 
 
+## Release notes
+
+### 0.0.19
+
+This release makes failures visible. Up to 0.0.18 a rejected token, a subject that was not
+API-enabled and a server error all came back looking like an ordinary empty result, so a
+scheduled job could report zeros instead of stopping. There are four behaviour changes, all
+deliberate.
+
+**Errors now raise instead of returning `None`.** Every non-success response raises a typed
+exception from `inmydata.exceptions`:
+
+| Status | Exception |
+| --- | --- |
+| 401 | `InmydataAuthenticationError` |
+| 403 | `InmydataAccessDeniedError` (commonly a subject not flagged API-enabled) |
+| 404 | `InmydataNotFoundError` |
+| 5xx | `InmydataServerError` |
+| any other non-2xx | `InmydataAPIError` |
+| 200 with a body the SDK cannot interpret | `InmydataResponseError` |
+
+All of them subclass `InmydataAPIError` and carry a `status_code`. `InmydataResponseError` also
+subclasses `ValueError`, so existing `except ValueError` handlers around a malformed response
+keep working.
+
+```python
+from inmydata import InmydataAccessDeniedError, InmydataAuthenticationError
+
+try:
+    frame = driver.get_data("Sales", fields, filters)
+except InmydataAuthenticationError:
+    ...  # token missing, expired or invalid
+except InmydataAccessDeniedError:
+    ...  # authenticated, but this subject is not API-enabled
+```
+
+**`get_data` and `get_data_simple` return an empty DataFrame for zero rows**, with the queried
+columns and their types, and are annotated `-> pd.DataFrame` with no `| None`. Previously zero
+rows and an authentication failure were both `None`. Code that tests `if frame is None:` should
+now test `if frame.empty:`.
+
+**`get_schema` raises instead of returning `"Error retrieving schema: ..."`.** The success
+return is unchanged, so callers that parse the JSON keep working; anything sniffing for the
+error prefix should catch `InmydataAPIError` instead. Its return type is now correctly
+documented as `str`.
+
+**`caseSensitive` in `get_data_simple` now means what it says.** It was being passed straight
+into the filter's `CaseInsensitive` field, so `caseSensitive=True` produced a case-insensitive
+filter and vice versa. Queries relying on the old inverted behaviour will change results.
+
+Also fixed, and not a behaviour change anyone can have depended on: `get_chart` raised
+`AttributeError` when its optional `TopNUsed` argument was omitted. It now works on its
+documented default.
+
+Every request now sends a timeout, `(10, 300)` seconds connect and read by default, so an
+unresponsive platform no longer hangs the calling thread forever. Override it per driver with
+`StructuredDataDriver(..., timeout=...)` or `CalendarAssistant(..., timeout=...)`; a
+`requests.Timeout` propagates to the caller unchanged.
+
+`requires-python` is now `>=3.10`. This corrects a declaration that was already false: 0.0.18
+claimed 3.9 support but its `pd.DataFrame | None` annotations raise `TypeError` on import there.
+
+
 ## Usage/Examples
 
 For these examples you will need to set the following environment variables:
