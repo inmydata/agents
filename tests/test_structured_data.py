@@ -7,7 +7,7 @@ import pandas as pd
 import pytest
 import responses
 
-from conftest import CHART_URL, COLUMN_TYPES, DATA_URL, SCHEMA_URL, data_response
+from helpers import CHART_URL, COLUMN_TYPES, DATA_URL, SCHEMA_URL, data_response
 from inmydata.StructuredData import (
     AIDataFilter,
     AIDataSimpleFilter,

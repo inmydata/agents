@@ -7,7 +7,7 @@ from unittest import mock
 import pytest
 import responses
 
-from conftest import CALENDAR_DETAILS_URL, CALENDAR_RANGE_URL
+from helpers import CALENDAR_DETAILS_URL, CALENDAR_RANGE_URL
 from inmydata.CalendarAssistant import CalendarPeriodType
 from inmydata.exceptions import (
     InmydataAPIError,
