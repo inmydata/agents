@@ -104,3 +104,11 @@ jobs:
           path: dist/
 
       - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          # Treat a version PyPI already has as success rather than failure, so
+          # that re-running a release, or tagging a version that was published by
+          # hand before this workflow existed, does not fail the run. PyPI never
+          # allows a version to be replaced, so this skips rather than overwrites.
+          # The build job already fails when the tag and pyproject.toml disagree,
+          # which is the mistake actually worth catching.
+          skip-existing: true

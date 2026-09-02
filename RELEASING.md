@@ -108,7 +108,13 @@ at the time; `0.0.12`, `0.0.13`, `0.0.14`, `0.0.16` and `0.0.18` all appear as v
 `v0.0.18` pointing at `d8b424b`, the commit that both set the version and carried the built
 artefacts. The earlier gaps have been left alone.
 
-`v0.0.19` was tagged before this workflow existed, so nothing fired for it and it goes out via
-the manual route above. The workflow applies from the next release onward.
+`v0.0.19` was tagged before this workflow existed, so nothing fired for it, and 0.0.19 was
+never published. `0.0.20` was published by hand for the same reason and tagged afterwards.
+
+Re-running a release, or tagging a version that is already on PyPI, is safe: the publish step
+passes `skip-existing`, so an existing version is skipped rather than failing the run. PyPI
+never allows a version to be replaced, so nothing can be overwritten either way. What the
+workflow does still refuse is a tag whose number disagrees with `pyproject.toml`, which is the
+mistake worth catching.
 
 Every future release should have a tag, because the tag is what triggers publishing.
