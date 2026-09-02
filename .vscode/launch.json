@@ -1,0 +1,49 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Unit tests (offline)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["-v"],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": false
+    },
+    {
+      "name": "Integration: connectivity only",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["--integration", "-v", "-s", "tests/integration/test_connectivity.py"],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env",
+      "justMyCode": false
+    },
+    {
+      "name": "Integration: all read-only tests",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["--integration", "-v", "-s", "tests/integration"],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env",
+      "justMyCode": false
+    },
+    {
+      "name": "Integration: against LIVE (read-only, no confirmation)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["--integration", "-v", "-s", "tests/integration"],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env",
+      "env": { "INMYDATA_ENV": "live" },
+      "justMyCode": false
+    }
+  ]
+}

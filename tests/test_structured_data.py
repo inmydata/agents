@@ -7,7 +7,7 @@ import pandas as pd
 import pytest
 import responses
 
-from conftest import CHART_URL, COLUMN_TYPES, DATA_URL, SCHEMA_URL, data_response
+from helpers import CHART_URL, COLUMN_TYPES, DATA_URL, SCHEMA_URL, data_response
 from inmydata.StructuredData import (
     AIDataFilter,
     AIDataSimpleFilter,
@@ -56,6 +56,55 @@ def test_get_data_returns_the_decoded_frame(driver):
     assert len(frame) == 2
     assert frame["Customer"].tolist() == ["Acme", "Umbrella"]
     assert frame["Sales Value"].tolist() == [100.5, 200.25]
+
+
+@responses.activate
+@pytest.mark.parametrize("envelope", [False, True], ids=["top-level", "value-envelope"])
+def test_get_data_accepts_both_response_shapes(driver, envelope):
+    """The live platform returns the payload at the top level, with no envelope.
+
+    Requiring a "value" key made get_data unusable against the real API; a wrapped
+    body is still accepted in case any deployment sends one.
+    """
+    responses.add(
+        responses.POST,
+        DATA_URL,
+        body=data_response(CSV, no_rows=2, envelope=envelope),
+        status=200,
+    )
+    frame = driver.get_data("Sales", ["Customer", "Sales Value"], _filters())
+    assert frame["Customer"].tolist() == ["Acme", "Umbrella"]
+
+
+@responses.activate
+@pytest.mark.parametrize("envelope", [False, True], ids=["top-level", "value-envelope"])
+def test_get_chart_accepts_both_response_shapes(driver, envelope):
+    payload = {"visualisationID": "vis-789"}
+    body = json.dumps({"value": payload} if envelope else payload)
+    responses.add(responses.POST, CHART_URL, body=body, status=200)
+    result = driver.get_chart(
+        "Sales", ["Customer"], [], ["Sales Value"], [], ChartType.Bar, "Caption"
+    )
+    assert result == "vis-789"
+
+
+@responses.activate
+@pytest.mark.parametrize("envelope", [False, True], ids=["top-level", "value-envelope"])
+def test_get_schema_accepts_both_response_shapes(driver, envelope):
+    payload = {
+        "subjects": [
+            {
+                "name": "Sales",
+                "factFieldTypes": {"Customer": {}},
+                "metricFieldTypes": {"Sales Value": {}},
+            }
+        ]
+    }
+    body = json.dumps({"value": payload} if envelope else payload)
+    responses.add(responses.POST, SCHEMA_URL, body=body, status=200)
+    parsed = json.loads(driver.get_schema("tests"))
+    assert parsed["subjectsCount"] == 1
+    assert parsed["subjects"][0]["name"] == "Sales"
 
 
 @responses.activate

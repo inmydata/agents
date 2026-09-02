@@ -1,0 +1,19 @@
+{
+  "// note": "Committed so the test setup works the same for everyone. The .env file it points at is gitignored; copy .env.example to create it.",
+
+  "python.testing.pytestEnabled": true,
+  "python.testing.unittestEnabled": false,
+  "python.testing.pytestArgs": ["tests"],
+
+  "// envFile": "Loads .env for tests and debugging, so the integration tests find their credentials in the Test Explorer.",
+  "python.envFile": "${workspaceFolder}/.env",
+
+  "// interpreter": "Assumes the venv from TESTING.md. Change if yours lives elsewhere.",
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe",
+
+  "files.exclude": {
+    "**/__pycache__": true,
+    "**/*.egg-info": true,
+    ".pytest_cache": true
+  }
+}

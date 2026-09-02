@@ -13,7 +13,7 @@ import logging
 from typing import Optional, Tuple, Union
 from enum import Enum
 
-from ._http import DEFAULT_TIMEOUT
+from ._http import DEFAULT_TIMEOUT, unwrap_value
 from .exceptions import InmydataResponseError, raise_for_status
 
 
@@ -313,7 +313,9 @@ class CalendarAssistant:
             raise InmydataResponseError(f"{url} returned success with an empty body")
         try:
             response_json = json.loads(x.text)
-            value = response_json.get("value")
+            # The platform returns the range at the top level; a "value" envelope is
+            # accepted too, and an explicit null value still means "not defined".
+            value = unwrap_value(response_json)
             if value is not None:
                 rangedict = value
                 result = CalendarPeriodDateRange(
@@ -352,7 +354,7 @@ class CalendarAssistant:
             response_json = json.loads(x.text)
         except json.JSONDecodeError as e:
             raise InmydataResponseError(f"Invalid JSON from {url}: {e}") from e
-        value = response_json.get("value") if isinstance(response_json, dict) else None
+        value = unwrap_value(response_json) if isinstance(response_json, dict) else None
         if value is None:
             # A legitimate not-found: the calendar has no entry for this date. The callers
             # turn this into their existing "Calendar details not found" ValueError.
