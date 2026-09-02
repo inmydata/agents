@@ -12,7 +12,7 @@ from typing import Optional
 from typing import Optional, List, Dict, Any, Tuple, Union
 from datetime import datetime
 
-from ._http import DEFAULT_TIMEOUT
+from ._http import DEFAULT_TIMEOUT, unwrap_value
 from .exceptions import InmydataResponseError, raise_for_status
 
 _PANDAS_DTYPES = {
@@ -445,7 +445,7 @@ class StructuredDataDriver:
         except json.JSONDecodeError as e:
             raise InmydataResponseError(f"Invalid JSON from {url}: {e}") from e
 
-        payload = parsed.get("value", parsed) if isinstance(parsed, dict) else parsed
+        payload = unwrap_value(parsed)
 
         # Ensure structure we expect
         subjects: List[Dict[str, Any]] = []
@@ -518,9 +518,11 @@ class StructuredDataDriver:
                 raise InmydataResponseError(f"Could not decode the response from {url}: {e}") from e
             if not isinstance(decoded_response, dict):
                 raise InmydataResponseError("Decoded response is not a dictionary. Actual type: {}".format(type(decoded_response)))
-            value = decoded_response.get("value")
+            # The platform returns the data at the top level; a "value" envelope is
+            # accepted too. See unwrap_value.
+            value = unwrap_value(decoded_response)
             if value is None:
-                raise InmydataResponseError("Response does not contain 'value' or it is None")
+                raise InmydataResponseError("Response does not contain any data")
             value_json = jsonpickle.encode(value)
             if value_json is None:
                 raise InmydataResponseError("value_json is None and cannot be loaded as JSON")
@@ -621,9 +623,9 @@ class StructuredDataDriver:
             raise InmydataResponseError(f"Could not decode the response from {url}: {e}") from e
         if not isinstance(decoded_response, dict):
             raise InmydataResponseError("Decoded response is not a dictionary. Actual type: {}".format(type(decoded_response)))
-        value = decoded_response.get("value")
+        value = unwrap_value(decoded_response)
         if value is None:
-            raise InmydataResponseError("Response does not contain 'value' or it is None")
+            raise InmydataResponseError("Response does not contain any data")
         value_json = jsonpickle.encode(value)
         if value_json is None:
             raise InmydataResponseError("value_json is None and cannot be loaded as JSON")

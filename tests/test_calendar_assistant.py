@@ -59,6 +59,28 @@ def test_period_range_returns_the_dates(calendar):
 
 
 @responses.activate
+@pytest.mark.parametrize("envelope", [False, True], ids=["top-level", "value-envelope"])
+def test_period_range_accepts_both_response_shapes(calendar, envelope):
+    """The live platform returns the range at the top level, with no envelope."""
+    payload = {"startDate": "2026-09-01", "endDate": "2026-09-30"}
+    body = json.dumps({"value": payload} if envelope else payload)
+    responses.add(responses.POST, CALENDAR_RANGE_URL, body=body, status=200)
+    result = calendar.get_calendar_period_date_range(2026, 9, CalendarPeriodType.month)
+    assert result is not None
+    assert result.StartDate == date(2026, 9, 1)
+
+
+@responses.activate
+@pytest.mark.parametrize("envelope", [False, True], ids=["top-level", "value-envelope"])
+def test_financial_periods_accepts_both_response_shapes(calendar, envelope):
+    details = json.loads(DETAILS_BODY)["value"]
+    body = json.dumps({"value": details} if envelope else details)
+    responses.add(responses.POST, CALENDAR_DETAILS_URL, body=body, status=200)
+    periods = calendar.get_financial_periods(date(2026, 9, 1))
+    assert (periods.year, periods.month) == (2026, 9)
+
+
+@responses.activate
 def test_period_range_null_value_still_returns_none(calendar):
     """A null value is the legitimate not-found case, e.g. a period in a future year."""
     responses.add(

@@ -45,7 +45,10 @@ def gzip_csv(csv_text: str) -> str:
 
 
 def data_response(
-    csv_text: Optional[str] = None, no_rows: int = 0, columns=None
+    csv_text: Optional[str] = None,
+    no_rows: int = 0,
+    columns=None,
+    envelope: bool = False,
 ) -> str:
     """Builds the JSON body of a successful /ai/data response.
 
@@ -53,17 +56,17 @@ def data_response(
         csv_text: The CSV payload, or None for a zero-row response.
         no_rows: The row count the platform reports.
         columns: The column name to declared type map; defaults to COLUMN_TYPES.
+        envelope: Wrap the payload in a {"value": ...} envelope. The live platform
+            returns it at the top level, which is the default here; both shapes are
+            supported, so both are tested.
 
     Returns:
         str: The response body.
     """
-    return json.dumps(
-        {
-            "value": {
-                "noRows": no_rows,
-                "fileSize": 0 if csv_text is None else len(csv_text),
-                "csvDataString": "" if csv_text is None else gzip_csv(csv_text),
-                "columnNamesandTypes": COLUMN_TYPES if columns is None else columns,
-            }
-        }
-    )
+    payload = {
+        "noRows": no_rows,
+        "fileSize": 0 if csv_text is None else len(csv_text),
+        "csvDataString": "" if csv_text is None else gzip_csv(csv_text),
+        "columnNamesandTypes": COLUMN_TYPES if columns is None else columns,
+    }
+    return json.dumps({"value": payload} if envelope else payload)

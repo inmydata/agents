@@ -192,6 +192,34 @@ responses rather than mocks:
 - `get_chart` works with `TopNUsed` omitted, which used to raise `AttributeError`.
 - The calendar's genuine not-found cases still return `None` rather than raising.
 
+## Known platform issues these tests found
+
+**A zero-row query returns 500, not an empty result.** `AIChatLogic.AIAPIData` downloads
+the export file from S3 unconditionally, without checking `NoRows`, so a query matching
+nothing writes no file and the download fails:
+
+```
+500: An unexpected error occurred: One or more errors occurred.
+     (The specified key does not exist.)
+```
+
+That is a platform bug, not an SDK one, and it means the empty-DataFrame behaviour
+introduced in 0.0.19 cannot currently be reached through this API. Two integration tests
+therefore report **xfail** with that message rather than failing, so the suite stays green
+while the issue stays visible; they will flip to xpass once the platform is fixed.
+
+Worth noting what 0.0.19 changed here: 0.0.18 turned this 500 into `None`, which was
+indistinguishable from the empty result it is not. The SDK now raises
+`InmydataServerError`, so a real server fault is no longer disguised as no data.
+
+**Responses carry no `value` envelope.** Every endpoint returns its payload at the top
+level — `/ai/data` answers `{"noRows": ..., "csvDataString": ...}` directly. Up to and
+including 0.0.19 the SDK required a `{"value": ...}` wrapper in `get_data`, `get_chart` and
+both calendar methods, so those calls could not work against this API at all; only
+`get_schema` worked, because it happened to tolerate both shapes. Fixed by `unwrap_value`
+in `_http.py`, which accepts either. The unit tests cover both shapes for every affected
+method.
+
 ## Adding tests
 
 Unit tests go in `tests/`, use `responses` to mock HTTP, and must not touch the network.

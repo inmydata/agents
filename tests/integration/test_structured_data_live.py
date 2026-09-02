@@ -14,7 +14,11 @@ from inmydata.StructuredData import (
     AIDataSimpleFilter,
     ChartType,
 )
-from inmydata.exceptions import InmydataAccessDeniedError, InmydataAPIError
+from inmydata.exceptions import (
+    InmydataAccessDeniedError,
+    InmydataAPIError,
+    InmydataServerError,
+)
 
 pytestmark = pytest.mark.integration
 
@@ -89,11 +93,26 @@ def test_a_filter_matching_nothing_returns_an_empty_frame(live_driver, subject):
     if not dimension or not metric:
         pytest.skip(f"Subject {subject!r} has no usable dimension/metric pair.")
 
-    frame = live_driver.get_data_simple(
-        subject,
-        [dimension, metric],
-        [AIDataSimpleFilter(dimension, NO_SUCH_VALUE)],
-    )
+    try:
+        frame = live_driver.get_data_simple(
+            subject,
+            [dimension, metric],
+            [AIDataSimpleFilter(dimension, NO_SUCH_VALUE)],
+        )
+    except InmydataServerError as e:
+        if "specified key does not exist" in str(e).lower():
+            # Platform bug, not an SDK one. AIChatLogic.AIAPIData downloads the
+            # export file from S3 unconditionally, without checking NoRows, so a
+            # query matching nothing writes no file and the download 500s. The
+            # SDK cannot return an empty frame until the API can express one.
+            # Raising here rather than returning None is still the 0.0.19
+            # improvement: 0.0.18 turned this 500 into None, indistinguishable
+            # from the empty result it is not.
+            pytest.xfail(
+                f"Platform returns 500 for a zero-row query rather than an empty "
+                f"result: {e}"
+            )
+        raise
 
     assert frame is not None, "A zero-row result must not be None."
     assert isinstance(frame, pd.DataFrame)
@@ -145,14 +164,24 @@ def test_case_sensitivity_is_not_inverted(live_driver, subject):
         pytest.skip(f"No values in {dimension!r} contain letters.")
     flipped = values[0].swapcase()
 
-    sensitive = live_driver.get_data_simple(
-        subject, [dimension, metric], [AIDataSimpleFilter(dimension, flipped)],
-        caseSensitive=True,
-    )
-    insensitive = live_driver.get_data_simple(
-        subject, [dimension, metric], [AIDataSimpleFilter(dimension, flipped)],
-        caseSensitive=False,
-    )
+    def query(case_sensitive):
+        try:
+            return live_driver.get_data_simple(
+                subject, [dimension, metric],
+                [AIDataSimpleFilter(dimension, flipped)],
+                caseSensitive=case_sensitive,
+            )
+        except InmydataServerError as e:
+            if "specified key does not exist" in str(e).lower():
+                pytest.xfail(
+                    f"Platform returns 500 rather than an empty result when a "
+                    f"filter matches no rows, so the case-sensitive half of this "
+                    f"comparison cannot be measured: {e}"
+                )
+            raise
+
+    sensitive = query(True)
+    insensitive = query(False)
 
     assert len(insensitive) >= len(sensitive), (
         f"Case-insensitive matching on {dimension!r}={flipped!r} returned "
