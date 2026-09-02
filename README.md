@@ -34,6 +34,31 @@ live platform, and [RELEASING.md](RELEASING.md) for how a version reaches PyPI.
 
 ## Release notes
 
+### 0.0.20
+
+**Upgrade to this release if you use `get_data`, `get_chart` or `CalendarAssistant`.**
+0.0.19 and every earlier version required the platform to wrap its responses in a
+`{"value": ...}` envelope. That envelope was never intentional: the API's controllers used
+to return `Ok(await logic(...))`, wrapping an `IActionResult` inside another `Ok()`, so
+ASP.NET serialised the result object itself and its `Value` property became the envelope.
+The platform has since stopped doing that, which left these calls unable to read a
+perfectly good response:
+
+| Call | Before this release, against the current API |
+| --- | --- |
+| `get_data`, `get_data_simple` | `ValueError: Response does not contain 'value' or it is None` |
+| `get_chart` | the same |
+| `get_financial_periods` and friends | `KeyError: 'value'` |
+| `get_calendar_period_date_range` | returned `None`, meaning "period not defined" — a wrong answer, not an error |
+| `get_schema` | worked; it always tolerated both shapes |
+
+This release accepts a response with or without the envelope, so **it works against both
+old and new platform builds**. You can upgrade before or after your platform is updated,
+in either order.
+
+No API changes and nothing else to do: if your code worked against an older platform it
+keeps working, and if it was failing with the errors above it starts working.
+
 ### 0.0.19
 
 This release makes failures visible. Up to 0.0.18 a rejected token, a subject that was not
