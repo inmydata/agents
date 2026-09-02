@@ -11,9 +11,9 @@ profile has its own base URL and API key, so live and test credentials never hav
 be swapped in and out of the same variable:
 
     INMYDATA_ENV=test                 # or live; defaults to test
-    INMYDATA_TEST_BASE_URL=https://api.test-inmydata.com
+    INMYDATA_TEST_BASE_URL=https://test.test-inmydata.com
     INMYDATA_TEST_API_KEY=...
-    INMYDATA_LIVE_BASE_URL=https://yourtenant.inmydata.com
+    INMYDATA_LIVE_BASE_URL=https://demo.inmydata.com
     INMYDATA_LIVE_API_KEY=...
 
 The default is deliberately `test`, so forgetting to set INMYDATA_ENV cannot send a
@@ -22,11 +22,16 @@ test run at production.
 A note on the base URL. The SDK does not accept one: every driver builds its URLs as
 `https://{tenant}.{server}/api/developer/v1/ai/...` from the two constructor
 arguments. So a base URL given here is split at the first dot of its host, and the
-halves are passed as `tenant` and `server`. For https://api.test-inmydata.com that
-means tenant="api", server="test-inmydata.com", which reassembles to the host you
+halves are passed as `tenant` and `server`. For https://test.test-inmydata.com that
+means tenant="test", server="test-inmydata.com", which reassembles to the host you
 asked for. The platform takes the real tenant from the imd_tenant claim on the API
 key rather than from the hostname, so the tenant half being a routing artefact rather
 than a tenant name does not matter to the server.
+
+Use test.test-inmydata.com for test and demo.inmydata.com for live. Both are tenant
+subdomains, the shape the SDK is built for, and both serve these routes. Do not use
+api.inmydata.com: it is an AWS API Gateway fronting the OData Lambda, expects
+SigV4-signed requests, and cannot serve the SDK. See TESTING.md.
 """
 
 import os
@@ -80,7 +85,7 @@ def _split_host(base_url: str):
     """Splits a base URL into the tenant and server halves the SDK expects.
 
     Args:
-        base_url: A URL such as https://api.test-inmydata.com. A bare host without a
+        base_url: A URL such as https://test.test-inmydata.com. A bare host without a
             scheme is accepted too.
 
     Returns:

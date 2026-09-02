@@ -124,23 +124,54 @@ Consequences:
 - If splitting at the first dot is wrong for some host, set `INMYDATA_<ENV>_TENANT` and
   `INMYDATA_<ENV>_SERVER` directly; they override the base URL.
 
-### Known state of the two hosts
+### Which host to use
 
-Checked on 1 September 2026:
+**Test: `https://test.test-inmydata.com`. Live: `https://demo.inmydata.com`.** Both are
+tenant subdomains, which is exactly the shape the SDK is built for, and both answer an
+unauthenticated POST to `/api/developer/v1/ai/getapisubjectlistinfo` with **401 and an
+empty body** — the ASP.NET web application refusing the request, which is what proves the
+route is served there.
 
-- **`api.test-inmydata.com`** resolves to the test web application load balancer, and an
-  unauthenticated POST to `/api/developer/v1/ai/getapisubjectlistinfo` returns **401 with
-  an empty body**. That is the web application refusing the request, so the route is
-  served there. This host is correct for the test system.
-- **`api.inmydata.com`** resolves to an AWS API Gateway
-  (`execute-api.eu-west-1.amazonaws.com`), and the same request returns **403
-  `{"message":"Missing Authentication Token"}`** — API Gateway's stock reply, not the web
-  application's. Sending a Bearer token to it is refused with `Invalid key=value pair
-  (missing equal-sign) in Authorization header (hashed with SHA-256 and encoded with
-  Base64)`, which is AWS SigV4 complaining: that host expects signed AWS requests, not
-  the Bearer token the SDK sends. It is a different service, and `api.inmydata.com`
-  appears nowhere in the platform source. In production the developer API is served per
-  tenant, so `INMYDATA_LIVE_BASE_URL` is normally `https://<yourtenant>.inmydata.com`.
+Probed on 1 September 2026:
+
+| Host | Answers | What it is |
+| --- | --- | --- |
+| `test.test-inmydata.com` | 401, empty | test tenant — **use for test** |
+| `demo.inmydata.com` | 401, empty | demo tenant on live — **use for live** |
+| `data.inmydata.com` | 401, empty | live web application, the platform's `DataServer` |
+| `data.test-inmydata.com` | 401, empty | test web application, the staging `DataServer` |
+| `api.test-inmydata.com` | 401, empty | test web application, incidentally |
+| `api.inmydata.com` | 403 `Missing Authentication Token` | AWS API Gateway, **not** the SDK's API |
+| `live.inmydata.com` | 405, HTML | something else, not the API |
+
+Several hosts work because the web application's nginx uses `server_name _` and accepts
+any Host header pointed at its load balancer. Prefer the tenant subdomains above: they
+match how the SDK is documented elsewhere in this repository, and they are the names least
+likely to be repurposed.
+
+Two things worth knowing about the rows to avoid.
+
+**`api.inmydata.com` is the OData Lambda, not the developer API.** It resolves to an AWS
+API Gateway (`execute-api.eu-west-1.amazonaws.com`) fronting the platform's `OData`
+project, which is an AWS Lambda (`OData/OData/LambdaEntryPoint.cs`). Sending it a Bearer
+token is refused with `Invalid key=value pair (missing equal-sign) in Authorization
+header (hashed with SHA-256 and encoded with Base64)` — AWS SigV4 complaining, because
+that gateway expects signed AWS requests rather than the Bearer token the SDK sends. It
+also resolves its tenant from the hostname via a database lookup
+(`GetAPITenant(host)`), which is a different model from the developer API's. Pointing the
+SDK at it cannot work.
+
+**`api.test-inmydata.com` works today only by accident.** The test web application's nginx
+config uses `server_name _`, so it accepts any Host header pointed at its load balancer.
+That host is therefore answering because DNS aims it at the test web application, not
+because anything routes it deliberately. Given `api.inmydata.com` is the OData gateway on
+live, the `api.` name on test is a reasonable candidate to be repurposed the same way, at
+which point the SDK would stop working against it. Prefer `data.test-inmydata.com`.
+
+`test_endpoint_exists_and_requires_authentication` in `test_connectivity.py` encodes these
+checks, so **to evaluate any candidate host**, point `INMYDATA_<ENV>_BASE_URL` at it and run
+that one test. It distinguishes "web application" from "API Gateway" for you rather than
+leaving you to read a stack trace.
 
 `test_endpoint_exists_and_requires_authentication` in `test_connectivity.py` encodes both
 checks, so if any of this changes the test tells you rather than the docs going stale.
