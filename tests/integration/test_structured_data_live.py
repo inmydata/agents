@@ -17,13 +17,35 @@ from inmydata.StructuredData import (
 from inmydata.exceptions import (
     InmydataAccessDeniedError,
     InmydataAPIError,
-    InmydataServerError,
+    InmydataResponseError,
 )
 
 pytestmark = pytest.mark.integration
 
 # A value no real dimension should hold, used to force a zero-row result.
 NO_SUCH_VALUE = "__inmydata_sdk_integration_test_no_such_value__"
+
+
+def _is_zero_row_platform_bug(error):
+    """True if this error is the platform failing on a zero-row query.
+
+    AIChatLogic.AIAPIData downloaded the export file from S3 without checking NoRows,
+    so a query matching nothing threw "The specified key does not exist". Fixed in
+    datapaltd/inmydata#270, but an environment that has not taken that build yet still
+    fails, and the two environments surface it differently:
+
+    - test, post-fix build: 500 carrying the S3 message.
+    - demo, pre-fix build: bare 405 with an empty body, because the unhandled
+      exception is turned into an error route that only serves GET and HEAD. A 405 on
+      an endpoint that answers the same POST correctly for a non-empty result is not
+      something the SDK can cause, so it is safe to read as this bug.
+
+    Confirmed on demo by filtering on a real value ("Dr. Aaliyah Andrews" returned one
+    row) versus a value matching nothing, which 405s. Filters themselves work.
+    """
+    if "specified key does not exist" in str(error).lower():
+        return True
+    return getattr(error, "status_code", None) == 405
 
 
 def test_get_schema_returns_usable_subjects(live_driver, request):
@@ -99,8 +121,8 @@ def test_a_filter_matching_nothing_returns_an_empty_frame(live_driver, subject):
             [dimension, metric],
             [AIDataSimpleFilter(dimension, NO_SUCH_VALUE)],
         )
-    except InmydataServerError as e:
-        if "specified key does not exist" in str(e).lower():
+    except InmydataAPIError as e:
+        if _is_zero_row_platform_bug(e):
             # Platform bug, not an SDK one. AIChatLogic.AIAPIData downloads the
             # export file from S3 unconditionally, without checking NoRows, so a
             # query matching nothing writes no file and the download 500s. The
@@ -109,8 +131,8 @@ def test_a_filter_matching_nothing_returns_an_empty_frame(live_driver, subject):
             # improvement: 0.0.18 turned this 500 into None, indistinguishable
             # from the empty result it is not.
             pytest.xfail(
-                f"Platform returns 500 for a zero-row query rather than an empty "
-                f"result: {e}"
+                f"Platform fails a zero-row query instead of returning an empty "
+                f"result (fixed in inmydata#270, not on this build): {e}"
             )
         raise
 
@@ -121,13 +143,22 @@ def test_a_filter_matching_nothing_returns_an_empty_frame(live_driver, subject):
 
 
 def test_an_unknown_subject_is_refused(live_driver):
-    """A subject that is not API-enabled must raise, not return None."""
+    """A subject that is not API-enabled must raise, not return None.
+
+    What it raises depends on the build. 403 is the documented answer, and a 400 or 500
+    is defensible for a name the platform cannot resolve at all. The demo build instead
+    answers 200 with an AWS Lambda style error envelope carrying a "statusCode" key,
+    which the SDK cannot read as data and reports as InmydataResponseError with no
+    status code. All three are acceptable; returning None would not be.
+    """
     with pytest.raises(InmydataAPIError) as excinfo:
         live_driver.get_data("__inmydata_sdk_no_such_subject__", ["anything"], [])
 
-    # 403 is the documented answer for a subject that is not API-enabled; the
-    # platform may also answer 400 or 500 for a name it cannot resolve at all.
-    assert excinfo.value.status_code is not None
+    error = excinfo.value
+    assert error.status_code is not None or isinstance(error, InmydataResponseError), (
+        f"An unknown subject must fail with either a status code or a response-shape "
+        f"error, got {error!r}"
+    )
 
 
 def test_case_sensitivity_is_not_inverted(live_driver, subject):
@@ -171,8 +202,8 @@ def test_case_sensitivity_is_not_inverted(live_driver, subject):
                 [AIDataSimpleFilter(dimension, flipped)],
                 caseSensitive=case_sensitive,
             )
-        except InmydataServerError as e:
-            if "specified key does not exist" in str(e).lower():
+        except InmydataAPIError as e:
+            if _is_zero_row_platform_bug(e):
                 pytest.xfail(
                     f"Platform returns 500 rather than an empty result when a "
                     f"filter matches no rows, so the case-sensitive half of this "

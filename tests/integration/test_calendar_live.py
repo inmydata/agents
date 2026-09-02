@@ -5,7 +5,7 @@ from datetime import date
 import pytest
 
 from inmydata.CalendarAssistant import CalendarPeriodType
-from inmydata.exceptions import InmydataAPIError
+from inmydata.exceptions import InmydataAPIError, InmydataResponseError
 
 pytestmark = pytest.mark.integration
 
@@ -51,30 +51,47 @@ def test_the_current_month_has_a_date_range_containing_today(live_calendar):
     )
 
 
-def test_an_undefined_period_returns_none_rather_than_raising(live_calendar):
-    """The legitimate not-found case must still be None after 0.0.19.
+def test_a_period_beyond_the_calendar_gives_a_typed_answer(live_calendar):
+    """A period past the end of the calendar is out of range, by design.
 
-    A year far in the future is unlikely to be defined in any calendar. If it happens
-    to be, the assertion below still holds for a well-formed answer.
+    Confirmed with Gary on 2 September 2026: asking for a year the calendar does not
+    cover is not expected to succeed, so the platform answering 400 is intended
+    behaviour rather than a defect. What this test pins down is that the SDK turns it
+    into something a caller can handle — a typed InmydataAPIError carrying a status
+    code, or None — and never a bare crash or a misleading empty result.
     """
-    result = live_calendar.get_calendar_period_date_range(
-        2099, 13, CalendarPeriodType.month
-    )
+    try:
+        result = live_calendar.get_calendar_period_date_range(
+            2099, 9, CalendarPeriodType.month
+        )
+    except InmydataAPIError as e:
+        assert e.status_code is not None or isinstance(e, InmydataResponseError), (
+            f"An out-of-range period must fail with either a status code or a "
+            f"response-shape error, got {e!r}"
+        )
+        return
 
+    # A calendar that does define the period must return a coherent range.
     if result is not None:
         assert result.StartDate <= result.EndDate
-    # None here means "not defined in this calendar", unambiguously, because a
-    # transport or auth failure would have raised instead.
 
 
 def test_periods_are_not_defined_for_an_absurd_period_number(live_calendar):
-    """Period 99 of a month should be absent, not an error result."""
+    """Period 99 of a month should be absent, not a garbled result.
+
+    A 4xx is a defensible answer to nonsense input. The demo build instead answers 200
+    with a bare error string where an object belongs, which the SDK reports as
+    InmydataResponseError carrying no status code. Both are acceptable: the point is
+    that the SDK raises something typed rather than returning nonsense.
+    """
     try:
         result = live_calendar.get_calendar_period_date_range(
             date.today().year, 99, CalendarPeriodType.month
         )
     except InmydataAPIError as e:
-        # A 4xx is a defensible answer to nonsense input; the point is it is typed.
-        assert e.status_code is not None
+        assert e.status_code is not None or isinstance(e, InmydataResponseError), (
+            f"An out-of-range period must fail with either a status code or a "
+            f"response-shape error, got {e!r}"
+        )
         return
     assert result is None or result.StartDate <= result.EndDate
