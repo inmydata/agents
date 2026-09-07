@@ -1,0 +1,3 @@
+- Python package built with Hatchling; supported Python is `>=3.10`.
+- Runtime dependencies include aiohttp, jsonpickle, pandas, requests, and signalrcore.
+- Pytest plus responses provide offline unit testing; package version is declared in `pyproject.toml`.
