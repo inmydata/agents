@@ -7,7 +7,7 @@ import pandas as pd
 import pytest
 import responses
 
-from helpers import CHART_URL, COLUMN_TYPES, DATA_URL, SCHEMA_URL, data_response
+from helpers import CHART_URL, COLUMN_TYPES, DATA_URL, SCHEMA_URL, SERVER, TENANT, data_response
 from inmydata.StructuredData import (
     AIDataFilter,
     AIDataSimpleFilter,
@@ -56,6 +56,59 @@ def test_get_data_returns_the_decoded_frame(driver):
     assert len(frame) == 2
     assert frame["Customer"].tolist() == ["Acme", "Umbrella"]
     assert frame["Sales Value"].tolist() == [100.5, 200.25]
+
+
+@responses.activate
+def test_user_id_is_included_in_structured_data_payloads():
+    from inmydata.StructuredData import StructuredDataDriver
+
+    driver = StructuredDataDriver(
+        tenant=TENANT, server=SERVER, api_key="test-key", user_id="user-123"
+    )
+    responses.add(responses.POST, DATA_URL, body=data_response(CSV, no_rows=2), status=200)
+    responses.add(
+        responses.POST,
+        CHART_URL,
+        body=json.dumps({"value": {"visualisationID": "vis-123"}}),
+        status=200,
+    )
+    responses.add(
+        responses.POST,
+        SCHEMA_URL,
+        body=json.dumps({"subjects": []}),
+        status=200,
+    )
+
+    driver.get_data("Sales", ["Customer", "Sales Value"], _filters())
+    driver.get_chart("Sales", ["Customer"], [], ["Sales Value"], [], ChartType.Bar, "Caption")
+    driver.get_schema()
+
+    assert [json.loads(call.request.body)["UserId"] for call in responses.calls] == [
+        "user-123",
+        "user-123",
+        "user-123",
+    ]
+
+
+@responses.activate
+def test_structured_data_payloads_omit_user_id_by_default(driver):
+    responses.add(responses.POST, DATA_URL, body=data_response(CSV, no_rows=2), status=200)
+    responses.add(
+        responses.POST,
+        CHART_URL,
+        body=json.dumps({"value": {"visualisationID": "vis-123"}}),
+        status=200,
+    )
+    responses.add(
+        responses.POST,
+        SCHEMA_URL,
+        body=json.dumps({"subjects": []}),
+        status=200,
+    )
+    driver.get_data("Sales", ["Customer", "Sales Value"], _filters())
+    driver.get_chart("Sales", ["Customer"], [], ["Sales Value"], [], ChartType.Bar, "Caption")
+    driver.get_schema()
+    assert all("UserId" not in json.loads(call.request.body) for call in responses.calls)
 
 
 @responses.activate

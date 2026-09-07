@@ -264,18 +264,22 @@ class StructuredDataDriver:
             The file to log messages to, if None, logs will be printed to the console.
     """
     class _AIDataAPIRequest:
-        def __init__(self, Subject: str, Fields: list[str], Filters: list['AIDataFilter'], TopNUsed: dict['str', 'TopNOption']):
+        def __init__(self, Subject: str, Fields: list[str], Filters: list['AIDataFilter'], TopNUsed: dict['str', 'TopNOption'], UserId: Optional[str] = None):
             self.Subject = Subject
             self.Fields = Fields
             self.Filters = Filters  # List of AIDataFilterUsed
             self.TopNUsed = TopNUsed
+            self.UserId = UserId
         def to_dict(self):
-            return {
+            result = {
                 "Subject": self.Subject,
                 "Fields": self.Fields,
                 "Filters": [f.to_dict() for f in self.Filters],
                 "TopNUsed": {k: v.to_dict() for k, v in self.TopNUsed.items()} 
             }
+            if self.UserId is not None:
+                result["UserId"] = self.UserId
+            return result
 
     class _AIDataAPIResponse:
         def __init__(self,noRows,fileSize,csvDataString,columnNamesandTypes):      
@@ -287,30 +291,35 @@ class StructuredDataDriver:
           return json.dumps(self, default=lambda o: o.__dict__, sort_keys=True, indent=4)
         
     class _AIChartAPIRequest:
-        def __init__(self,Subject,RowFields,ColumnsFields,MetricFields,Filters,ChartType,Caption,User,SessionID,TopNUsed):
-          self.Subject = Subject
-          self.RowFields = RowFields
-          self.ColumnFields = ColumnsFields
-          self.MetricFields = MetricFields
-          self.Filters = Filters
-          self.ChartType = ChartType
-          self.User = User
-          self.Caption = Caption
-          self.SessionID = SessionID
-          self.TopNUsed = TopNUsed
+        def __init__(self, Subject, RowFields, ColumnsFields, MetricFields, Filters, ChartType, Caption, User, SessionID, TopNUsed, UserId: Optional[str] = None):
+            self.Subject = Subject
+            self.RowFields = RowFields
+            self.ColumnFields = ColumnsFields
+            self.MetricFields = MetricFields
+            self.Filters = Filters
+            self.ChartType = ChartType
+            self.User = User
+            self.Caption = Caption
+            self.SessionID = SessionID
+            self.TopNUsed = TopNUsed
+            self.UserId = UserId
+
         def to_dict(self):
-            return {
+            result = {
                 "Subject": self.Subject,
                 "RowFields": self.RowFields,
                 "ColumnFields": self.ColumnFields,
                 "MetricFields": self.MetricFields,
-                "Filters": [f.to_dict() for f in self.Filters], 
-                "ChartType": self.ChartType.name.lower(),  
+                "Filters": [f.to_dict() for f in self.Filters],
+                "ChartType": self.ChartType.name.lower(),
                 "User": self.User,
                 "Caption": self.Caption,
                 "SessionID": self.SessionID,
-                "TopNUsed": {k: v.to_dict() for k, v in self.TopNUsed.items()} 
+                "TopNUsed": {key: value.to_dict() for key, value in self.TopNUsed.items()},
             }
+            if self.UserId is not None:
+                result["UserId"] = self.UserId
+            return result
         
     class _AIChartAPIResponse:
         def __init__(self,visualisationID):      
@@ -318,7 +327,7 @@ class StructuredDataDriver:
         def toJSON(self):
           return json.dumps(self, default=lambda o: o.__dict__, sort_keys=True, indent=4)
 
-    def __init__(self, tenant: str, server:str ="inmydata.com", user: Optional[str] = None, session_id: Optional[str] = None,  api_key: Optional[str] = None, logging_level: Optional[int] = logging.INFO, log_file: Optional[str] = None, timeout: Optional[Union[float, Tuple[float, float]]] = None ):
+    def __init__(self, tenant: str, server:str ="inmydata.com", user: Optional[str] = None, session_id: Optional[str] = None,  api_key: Optional[str] = None, logging_level: Optional[int] = logging.INFO, log_file: Optional[str] = None, timeout: Optional[Union[float, Tuple[float, float]]] = None, user_id: Optional[str] = None ):
         """
         Initializes the StructuredDataDriver with the specified tenant, server, logging level, and log file.
 
@@ -346,6 +355,7 @@ class StructuredDataDriver:
         self.user = user
         self.session_id = session_id
         self.timeout = DEFAULT_TIMEOUT if timeout is None else timeout
+        self.user_id = user_id
 
         # Create a logger specific to this class/instance
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}.{tenant}")
@@ -437,6 +447,8 @@ class StructuredDataDriver:
                 'Content-Type': 'application/json'}
         url = 'https://' + self.tenant + '.' + self.server + '/api/developer/v1/ai/getapisubjectlistinfo'
         req_body = {"subject": None}
+        if self.user_id is not None:
+            req_body["UserId"] = self.user_id
         x = requests.post(url,headers=headers, json=req_body, timeout=self.timeout)
         raise_for_status(x.status_code, x.text, url)
 
@@ -501,7 +513,7 @@ class StructuredDataDriver:
             """
             if TopNUsed is None:
                 TopNUsed = {}
-            aidatareq = self._AIDataAPIRequest(subject,fields,filters,TopNUsed)
+            aidatareq = self._AIDataAPIRequest(subject,fields,filters,TopNUsed,self.user_id)
             input_json_string  = jsonpickle.encode(aidatareq.to_dict(), unpicklable=False)
             self.logger.info("Executing " + str(input_json_string))
             if input_json_string is None:
@@ -604,7 +616,7 @@ class StructuredDataDriver:
             # get_data has always done this; get_chart did not, so omitting the documented
             # optional argument raised AttributeError in _AIChartAPIRequest.to_dict().
             TopNUsed = {}
-        aichartreq = self._AIChartAPIRequest(subject,rowfields,columnfields,metricfields,filters,charttype,caption,self.user,self.session_id,TopNUsed)
+        aichartreq = self._AIChartAPIRequest(subject,rowfields,columnfields,metricfields,filters,charttype,caption,self.user,self.session_id,TopNUsed,self.user_id)
         input_json_string  = jsonpickle.encode(aichartreq.to_dict(), unpicklable=False)
         if input_json_string is None:
             raise ValueError("input_json_string is None and cannot be loaded as JSON")

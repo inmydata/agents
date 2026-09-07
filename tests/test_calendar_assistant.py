@@ -7,7 +7,7 @@ from unittest import mock
 import pytest
 import responses
 
-from helpers import CALENDAR_DETAILS_URL, CALENDAR_RANGE_URL
+from helpers import CALENDAR_DETAILS_URL, CALENDAR_RANGE_URL, SERVER, TENANT
 from inmydata.CalendarAssistant import CalendarPeriodType
 from inmydata.exceptions import (
     InmydataAPIError,
@@ -56,6 +56,48 @@ def test_period_range_returns_the_dates(calendar):
     assert result is not None
     assert result.StartDate == date(2026, 9, 1)
     assert result.EndDate == date(2026, 9, 30)
+
+
+@responses.activate
+def test_user_id_is_included_in_calendar_payloads():
+    from inmydata.CalendarAssistant import CalendarAssistant
+
+    calendar = CalendarAssistant(
+        tenant=TENANT,
+        calendar_name="Default",
+        server=SERVER,
+        api_key="test-key",
+        user_id="user-123",
+    )
+    responses.add(
+        responses.POST,
+        CALENDAR_RANGE_URL,
+        body=json.dumps({"value": {"startDate": "2026-09-01", "endDate": "2026-09-30"}}),
+        status=200,
+    )
+    responses.add(responses.POST, CALENDAR_DETAILS_URL, body=DETAILS_BODY, status=200)
+
+    calendar.get_calendar_period_date_range(2026, 9, CalendarPeriodType.month)
+    calendar.get_financial_periods(date(2026, 9, 1))
+
+    assert [json.loads(call.request.body)["UserId"] for call in responses.calls] == [
+        "user-123",
+        "user-123",
+    ]
+
+
+@responses.activate
+def test_calendar_payloads_omit_user_id_by_default(calendar):
+    responses.add(
+        responses.POST,
+        CALENDAR_RANGE_URL,
+        body=json.dumps({"value": {"startDate": "2026-09-01", "endDate": "2026-09-30"}}),
+        status=200,
+    )
+    responses.add(responses.POST, CALENDAR_DETAILS_URL, body=DETAILS_BODY, status=200)
+    calendar.get_calendar_period_date_range(2026, 9, CalendarPeriodType.month)
+    calendar.get_financial_periods(date(2026, 9, 1))
+    assert all("UserId" not in json.loads(call.request.body) for call in responses.calls)
 
 
 @responses.activate

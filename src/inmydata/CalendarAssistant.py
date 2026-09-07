@@ -86,16 +86,15 @@ class CalendarAssistant:
     """
 
     class _GetCalendarDetailsRequest:
-        def __init__(self,UseDate,CalendarName):      
-          self.UseDate = UseDate
-          self.CalendarName = CalendarName
+        def __init__(self, UseDate, CalendarName, UserId: Optional[str] = None):
+            self.UseDate = UseDate
+            self.CalendarName = CalendarName
+            if UserId is not None:
+                self.UserId = UserId
+
         def toJSON(self):
-            """ Converts the _GetCalendarDetailsRequest object to a JSON string.
-            
-            Returns:
-                str: A JSON string representation of the _GetCalendarDetailsRequest object.
-            """
-            return json.dumps(self, default=lambda o: o.__dict__, sort_keys=True, indent=4)
+            """Converts the _GetCalendarDetailsRequest object to a JSON string."""
+            return json.dumps(self, default=lambda value: value.__dict__, sort_keys=True, indent=4)
 
     class _GetCalendarDetailsResponse:
         def __init__(self,dateDetails):      
@@ -134,20 +133,25 @@ class CalendarAssistant:
             return json.dumps(self, default=lambda o: o.__dict__, sort_keys=True, indent=4)
         
     class _GetCalendarPeriodDateRangeRequest:
-        def __init__(self,PeriodType:CalendarPeriodType,Year:int,PeriodNumber:int,CalendarName:str):      
-          self.PeriodType = PeriodType
-          self.Year = Year
-          self.PeriodNumber = PeriodNumber
-          self.CalendarName = CalendarName
+        def __init__(self, PeriodType: CalendarPeriodType, Year: int, PeriodNumber: int, CalendarName: str, UserId: Optional[str] = None):
+            self.PeriodType = PeriodType
+            self.Year = Year
+            self.PeriodNumber = PeriodNumber
+            self.CalendarName = CalendarName
+            self.UserId = UserId
+
         def to_dict(self):
-            return {
+            result = {
                 "PeriodType": self.PeriodType.value,
                 "Year": self.Year,
                 "PeriodNumber": self.PeriodNumber,
-                "CalendarName": self.CalendarName
+                "CalendarName": self.CalendarName,
             }
+            if self.UserId is not None:
+                result["UserId"] = self.UserId
+            return result
 
-    def __init__(self, tenant: str, calendar_name: str, server: str = "inmydata.com", api_key: Optional[str] = None, logging_level=logging.INFO, log_file: Optional[str] = None, timeout: Optional[Union[float, Tuple[float, float]]] = None ):
+    def __init__(self, tenant: str, calendar_name: str, server: str = "inmydata.com", api_key: Optional[str] = None, logging_level=logging.INFO, log_file: Optional[str] = None, timeout: Optional[Union[float, Tuple[float, float]]] = None, user_id: Optional[str] = None ):
         """
         Initializes the CalendarAssistant with the specified tenant, calendar name, server, logging level, and optional log file.
         
@@ -173,6 +177,7 @@ class CalendarAssistant:
         self.calendar_name = calendar_name
         self.server = server
         self.timeout = DEFAULT_TIMEOUT if timeout is None else timeout
+        self.user_id = user_id
 
         # Create a logger specific to this class/instance
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}.{tenant}")
@@ -299,7 +304,7 @@ class CalendarAssistant:
                 interpreted.
         """
         result = None
-        calreq = self._GetCalendarPeriodDateRangeRequest(periodtype,year,periodnumber,self.calendar_name)
+        calreq = self._GetCalendarPeriodDateRangeRequest(periodtype,year,periodnumber,self.calendar_name,self.user_id)
         input_json_string  = jsonpickle.encode(calreq.to_dict(), unpicklable=False)
         if input_json_string is None:
             raise ValueError("input_json_string is None and cannot be loaded as JSON")
@@ -340,7 +345,7 @@ class CalendarAssistant:
             InmydataResponseError: If the platform returns success but the body cannot be
                 interpreted.
         """
-        caldetreq = self._GetCalendarDetailsRequest(input_date,self.calendar_name)
+        caldetreq = self._GetCalendarDetailsRequest(input_date,self.calendar_name,self.user_id)
         input_json_string  = jsonpickle.encode(caldetreq, unpicklable=False)
         if input_json_string is None:
             raise ValueError("input_json_string is None and cannot be loaded as JSON")

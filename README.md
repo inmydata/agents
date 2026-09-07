@@ -34,6 +34,14 @@ live platform, and [RELEASING.md](RELEASING.md) for how a version reaches PyPI.
 
 ## Release notes
 
+### 0.0.21
+
+`StructuredDataDriver`, `ConversationalDataDriver`, and `CalendarAssistant` now
+accept an optional `user_id` as their final constructor argument. When provided,
+the SDK sends it as `UserId` in data, chart, AI-question, calendar-detail,
+calendar-period-range, and schema requests. Calls that omit `user_id` retain their
+existing request payloads.
+
 ### 0.0.20
 
 **Upgrade to this release if you use `get_data`, `get_chart` or `CalendarAssistant`.**

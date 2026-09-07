@@ -114,21 +114,26 @@ class ConversationalDataDriver:
     """
 
     class _AIQuestionAPIRequest:
-        def __init__(self, Subject,Question,Date,Model,OutputType,AIType,SkipZeroQuestion,SkipGeneralQuestion,SummariseComments,ShowinChartComponent,User,SessionID):
-          self.Subject = Subject
-          self.Question = Question
-          self.Date = Date
-          self.model = Model
-          self.outputtype = OutputType
-          self.aitype = AIType
-          self.SkipZeroQuestion = SkipZeroQuestion
-          self.SkipGeneralQuestion = SkipGeneralQuestion
-          self.SummariseComments = SummariseComments
-          self.ShowinChartComponent = ShowinChartComponent
-          self.User = User
-          self.SessionID = SessionID
+        def __init__(self, Subject, Question, Date, Model, OutputType, AIType, SkipZeroQuestion, SkipGeneralQuestion, SummariseComments, ShowinChartComponent, User, SessionID, UserId: Optional[str] = None):
+            self.Subject = Subject
+            self.Question = Question
+            self.Date = Date
+            self.model = Model
+            self.outputtype = OutputType
+            self.aitype = AIType
+            self.SkipZeroQuestion = SkipZeroQuestion
+            self.SkipGeneralQuestion = SkipGeneralQuestion
+            self.SummariseComments = SummariseComments
+            self.ShowinChartComponent = ShowinChartComponent
+            self.User = User
+            self.SessionID = SessionID
+            self.UserId = UserId
+
         def toJSON(self):
-          return json.dumps(self, default=lambda o: o.__dict__, sort_keys=True, indent=4)
+            values = self.__dict__.copy()
+            if values["UserId"] is None:
+                del values["UserId"]
+            return json.dumps(values, sort_keys=True, indent=4)
 
     class _AIQuestionAPIResponse:
         def __init__(self, answer,answerDataJson,subject):
@@ -148,7 +153,7 @@ class ConversationalDataDriver:
         def toJSON(self):
           return json.dumps(self, default=lambda o: o.__dict__, sort_keys=True, indent=4)
 
-    def __init__(self, tenant: str, server:str ="inmydata.com", user: Optional[str] = None, session_id: Optional[str] = None,  api_key: Optional[str] = None, logging_level: Optional[int] = logging.INFO, log_file: Optional[str] = None):
+    def __init__(self, tenant: str, server:str ="inmydata.com", user: Optional[str] = None, session_id: Optional[str] = None,  api_key: Optional[str] = None, logging_level: Optional[int] = logging.INFO, log_file: Optional[str] = None, user_id: Optional[str] = None):
         """
         Initializes the ConversationalDataDriver with the specified tenant, server, logging level, and optional log file.
         
@@ -173,6 +178,7 @@ class ConversationalDataDriver:
         self.tenant = tenant
         self.user = user
         self.session_id = session_id
+        self.user_id = user_id
         
         # Create a logger specific to this class/instance
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}.{tenant}")
@@ -358,7 +364,8 @@ class ConversationalDataDriver:
             True, 
             generate_chart,
             self.user,
-            self.session_id)
+            self.session_id,
+            self.user_id)
         self.logger.debug("AIQuestionAPIRequest")
         self.logger.debug(aireq.toJSON())
         x = await self.__post_request('https://' + self.tenant + '.' + self.server + '/api/developer/v1/ai/question', data=json.loads(aireq.toJSON()))
