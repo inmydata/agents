@@ -1,0 +1,4 @@
+- Keep unit tests offline and mock HTTP calls with `responses`; inspect `responses.calls` to assert outbound request payloads.
+- Preserve public constructor compatibility by appending optional arguments.
+- SDK request serializers omit optional fields when absent where retaining legacy payloads is required.
+- `get_schema`, structured data, and calendar APIs use synchronous requests; conversational question transport is asynchronous.

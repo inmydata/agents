@@ -1,0 +1,4 @@
+- Configure the environment with `py -m venv .venv` and `.venv/Scripts/python.exe -m pip install -e ".[dev]"`.
+- Run offline tests: `.venv/Scripts/python.exe -m pytest -q`.
+- Run integration tests only with `--integration`; see `TESTING.md` for environment variables and safe write-test opt-in.
+- On Windows use PowerShell paths such as `.venv/Scripts/python.exe`.

@@ -1,0 +1,3 @@
+- Python SDK source lives in `src/inmydata`; unit tests are in `tests`, with live tests under `tests/integration`.
+- Public drivers construct platform URLs from `tenant` and `server`; request payload keys follow platform DTO casing (for example `UserId`).
+- Release process and constraints are documented in `RELEASING.md`.

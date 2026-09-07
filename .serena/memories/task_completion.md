@@ -1,0 +1,3 @@
+- For SDK changes, run `.venv/Scripts/python.exe -m pytest -q`.
+- Run `git diff --check` before committing.
+- For a release, bump `pyproject.toml`, add README release notes, build an artefact, then tag the main-branch commit with matching `v<version>`; see `RELEASING.md`.
